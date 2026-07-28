@@ -55,7 +55,7 @@
   // ⚙️ Configurações do projeto > seus apps > SDK setup and configuration
   // ------------------------------------------------------------------
   window.__FIREBASE_CONFIG__ = {
-   apiKey: "AIzaSyAWcwHAFLTLQ1fW2G94hAfuD4zN34ecQ2A",
+    apiKey: "AIzaSyAWcwHAFLTLQ1fW2G94hAfuD4zN34ecQ2A",
   authDomain: "controlerpv-9a502.firebaseapp.com",
   projectId: "controlerpv-9a502",
   storageBucket: "controlerpv-9a502.firebasestorage.app",
@@ -194,25 +194,33 @@ const BANCOS = {
 };
 const DONOS = { Bruno: { label: "Dr. Bruno" }, "Flávio": { label: "Dr. Flávio" } };
 
-function computeSplit({ valorTotal, percentualExito, dono, sucumbencial }) {
+function computeSplit({ valorTotal, percentualExito, dono, sucumbencial, valorAdministrativo }) {
   const total = Number(valorTotal) || 0;
   const donoIsBruno = dono === "Bruno";
   if (sucumbencial) {
-    return { escritorio: 0, cliente: 0, flavio: donoIsBruno ? 0 : total, bruno: donoIsBruno ? total : 0, honorarioTotal: total, baseDivisivel: 0, excedente: total };
+    return { escritorio: 0, cliente: 0, flavio: donoIsBruno ? 0 : total, bruno: donoIsBruno ? total : 0, honorarioTotal: total, baseDivisivel: 0, excedente: total, administrativoAplicado: 0 };
   }
   const pct = (Number(percentualExito) || 0) / 100;
   const honorarioTotal = total * pct;
   const baseDivisivel = Math.min(honorarioTotal, total * 0.3);
   const excedente = Math.max(0, honorarioTotal - baseDivisivel);
-  const escritorio = baseDivisivel * 0.4;
-  const donoShare = baseDivisivel * 0.5 + excedente;
+  let escritorio = baseDivisivel * 0.4;
+  let donoShare = baseDivisivel * 0.5 + excedente;
   const outroShare = baseDivisivel * 0.1;
-  const clienteValor = Math.max(0, total - honorarioTotal);
+
+  // Valor administrativo: sai do que sobraria para o cliente e vai integralmente
+  // para o escritório (cliente do Bruno) ou para o Dr. Flávio (cliente dele).
+  const restanteParaCliente = Math.max(0, total - honorarioTotal);
+  const administrativoAplicado = Math.min(Math.max(0, Number(valorAdministrativo) || 0), restanteParaCliente);
+  if (donoIsBruno) escritorio += administrativoAplicado;
+  else donoShare += administrativoAplicado;
+
+  const clienteValor = Math.max(0, total - honorarioTotal - administrativoAplicado);
   return {
     escritorio, cliente: clienteValor,
     flavio: donoIsBruno ? outroShare : donoShare,
     bruno: donoIsBruno ? donoShare : outroShare,
-    honorarioTotal, baseDivisivel, excedente,
+    honorarioTotal, baseDivisivel, excedente, administrativoAplicado,
   };
 }
 function administrativoDestino(dono) { return dono === "Flávio" ? "Dr. Flávio (integral)" : "Escritório (integral)"; }
@@ -384,11 +392,12 @@ function LoginScreen() {
 // ---------- Fee breakdown preview ----------
 function FeeBreakdown({ dono, percentualExito, valorEstimado, valorAdministrativo }) {
   const valor = parseNum(valorEstimado);
-  const split = computeSplit({ valorTotal: valor, percentualExito, dono, sucumbencial: false });
+  const split = computeSplit({ valorTotal: valor, percentualExito, dono, sucumbencial: false, valorAdministrativo });
   const donoLabel = dono === "Flávio" ? "Dr. Flávio" : "Dr. Bruno";
   const outroLabel = dono === "Flávio" ? "Dr. Bruno" : "Dr. Flávio";
   const donoTotal = dono === "Flávio" ? split.flavio : split.bruno;
   const outroTotal = dono === "Flávio" ? split.bruno : split.flavio;
+  const donoIsBrunoLocal = dono === "Bruno";
   return (
     <div style={{ backgroundColor: C.ink, borderRadius: 10, padding: 14 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
@@ -405,16 +414,14 @@ function FeeBreakdown({ dono, percentualExito, valorEstimado, valorAdministrativ
           <BreakdownRow label={`${donoLabel}, dono do cliente (50% + excedente)`} value={donoTotal} bold />
           <BreakdownRow label={`${outroLabel}, outro sócio (10% do divisível)`} value={outroTotal} bold />
           <BreakdownRow label="Cliente recebe" value={split.cliente} />
+          {split.administrativoAplicado > 0 && (
+            <div style={{ fontFamily: FONT_SANS, fontSize: 11.5, color: "#B7C2CE", marginTop: 6, lineHeight: 1.5 }}>
+              Já inclui {formatBRL(split.administrativoAplicado)} de valor administrativo, descontado do cliente e somado {donoIsBrunoLocal ? "ao escritório" : `a ${donoLabel}`} acima.
+            </div>
+          )}
         </React.Fragment>
       ) : (
         <span style={{ fontFamily: FONT_SANS, fontSize: 12, color: "#B7C2CE" }}>Informe o valor do RPV/precatório expedido para ver a simulação do rateio.</span>
-      )}
-      {parseNum(valorAdministrativo) > 0 && (
-        <React.Fragment>
-          <div style={{ height: 1, backgroundColor: "rgba(241,230,200,0.2)", margin: "8px 0" }} />
-          <BreakdownRow label="Valor administrativo (INSS)" value={parseNum(valorAdministrativo)} />
-          <div style={{ fontFamily: FONT_SANS, fontSize: 11.5, color: "#B7C2CE", marginTop: 2 }}>Destino: {administrativoDestino(dono)}</div>
-        </React.Fragment>
       )}
     </div>
   );
@@ -617,6 +624,11 @@ function AutoRateioPreview({ split }) {
         <LedgerValue label="Dr. Flávio" value={split.flavio} />
         <LedgerValue label="Dr. Bruno" value={split.bruno} />
       </div>
+      {split.administrativoAplicado > 0 && (
+        <div style={{ fontFamily: FONT_SANS, fontSize: 11, color: C.inkSoft, marginTop: 8 }}>
+          Inclui {formatBRL(split.administrativoAplicado)} de valor administrativo, descontado do cliente.
+        </div>
+      )}
     </div>
   );
 }
@@ -626,7 +638,7 @@ function FormTab({ form, setForm, onSubmit, editingId, onCancelEdit, photoDataUr
   const [showDetails, setShowDetails] = useState(false);
   function set(field, value) { setForm((f) => ({ ...f, [field]: value })); }
   const linkedClient = clientes.find((c) => c.id === form.clienteId) || null;
-  const autoSplit = linkedClient && !rateioManual ? computeSplit({ valorTotal: parseNum(form.valorTotal), percentualExito: linkedClient.percentualExito, dono: linkedClient.dono, sucumbencial: form.sucumbencial }) : null;
+  const autoSplit = linkedClient && !rateioManual ? computeSplit({ valorTotal: parseNum(form.valorTotal), percentualExito: linkedClient.percentualExito, dono: linkedClient.dono, sucumbencial: form.sucumbencial, valorAdministrativo: linkedClient.valorAdministrativo }) : null;
   const somaManual = parseNum(form.valorEscritorio) + parseNum(form.valorCliente) + parseNum(form.valorFlavio) + parseNum(form.valorBruno);
   const diffManual = Math.round((parseNum(form.valorTotal) - somaManual) * 100) / 100;
   const showDiffWarning = !autoSplit && form.valorTotal && Math.abs(diffManual) > 0.01;
@@ -1306,7 +1318,7 @@ function RPVLedgerApp() {
 
     let valores;
     if (linkedClient && !rateioManual) {
-      const split = computeSplit({ valorTotal: parseNum(form.valorTotal), percentualExito: linkedClient.percentualExito, dono: linkedClient.dono, sucumbencial: form.sucumbencial });
+      const split = computeSplit({ valorTotal: parseNum(form.valorTotal), percentualExito: linkedClient.percentualExito, dono: linkedClient.dono, sucumbencial: form.sucumbencial, valorAdministrativo: linkedClient.valorAdministrativo });
       valores = { valorEscritorio: split.escritorio, valorCliente: split.cliente, valorFlavio: split.flavio, valorBruno: split.bruno };
     } else {
       valores = { valorEscritorio: parseNum(form.valorEscritorio), valorCliente: parseNum(form.valorCliente), valorFlavio: parseNum(form.valorFlavio), valorBruno: parseNum(form.valorBruno) };
