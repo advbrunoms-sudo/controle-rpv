@@ -24,6 +24,10 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 
+<!-- PDF generation (real PDF file, shared/downloaded directly — works the same on iPhone, iPad and computer) -->
+<script src="https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://unpkg.com/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.js"></script>
+
 <style>
   html, body { margin: 0; padding: 0; background: #F6F1E7; }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -39,13 +43,6 @@
     border-radius: 999px; animation: rpv-spin 0.7s linear infinite;
   }
   @keyframes rpv-spin { to { transform: rotate(360deg); } }
-  .print-sheet { display: none; }
-  @media print {
-    @page { margin: 14mm; }
-    body * { visibility: hidden; }
-    .print-sheet, .print-sheet * { visibility: visible; }
-    .print-sheet { display: block !important; position: absolute; top: 0; left: 0; width: 100%; }
-  }
 </style>
 </head>
 <body>
@@ -58,12 +55,12 @@
   // ⚙️ Configurações do projeto > seus apps > SDK setup and configuration
   // ------------------------------------------------------------------
   window.__FIREBASE_CONFIG__ = {
-    apiKey: "AIzaSyAWcwHAFLTLQ1fW2G94hAfuD4zN34ecQ2A",
-  authDomain: "controlerpv-9a502.firebaseapp.com",
-  projectId: "controlerpv-9a502",
-  storageBucket: "controlerpv-9a502.firebasestorage.app",
-  messagingSenderId: "633816371066",
-  appId: "1:633816371066:web:f7b7d804b0ee8c1e1e50c3"
+    apiKey: "COLOQUE_AQUI_A_API_KEY",
+    authDomain: "COLOQUE_AQUI.firebaseapp.com",
+    projectId: "COLOQUE_AQUI_O_PROJECT_ID",
+    storageBucket: "COLOQUE_AQUI.appspot.com",
+    messagingSenderId: "COLOQUE_AQUI",
+    appId: "COLOQUE_AQUI"
   };
 </script>
 
@@ -195,7 +192,7 @@ const BANCOS = {
   CEF: { label: "Caixa Econômica Federal", short: "CEF", color: C.cef, accent: C.cefAccent },
   BB: { label: "Banco do Brasil", short: "BB", color: C.bb, accent: C.bbAccent },
 };
-const DONOS = { Bruno: { label: "Bruno" }, "Flávio": { label: "Dr. Flávio" } };
+const DONOS = { Bruno: { label: "Dr. Bruno" }, "Flávio": { label: "Dr. Flávio" } };
 
 function computeSplit({ valorTotal, percentualExito, dono, sucumbencial }) {
   const total = Number(valorTotal) || 0;
@@ -207,8 +204,8 @@ function computeSplit({ valorTotal, percentualExito, dono, sucumbencial }) {
   const honorarioTotal = total * pct;
   const baseDivisivel = Math.min(honorarioTotal, total * 0.3);
   const excedente = Math.max(0, honorarioTotal - baseDivisivel);
-  const escritorio = baseDivisivel * 0.5;
-  const donoShare = baseDivisivel * 0.4 + excedente;
+  const escritorio = baseDivisivel * 0.4;
+  const donoShare = baseDivisivel * 0.5 + excedente;
   const outroShare = baseDivisivel * 0.1;
   const clienteValor = Math.max(0, total - honorarioTotal);
   return {
@@ -252,7 +249,7 @@ function DonoBadge({ dono }) {
   const isFlavio = dono === "Flávio";
   return (
     <span style={{ display: "inline-flex", alignItems: "center", backgroundColor: isFlavio ? C.blueSoft : C.brassSoft, color: isFlavio ? C.blue : C.brassDark, fontFamily: FONT_SANS, fontSize: "11px", fontWeight: 700, letterSpacing: "0.03em", padding: "4px 8px", borderRadius: 6 }}>
-      {isFlavio ? "Dr. Flávio" : "Bruno"}
+      {isFlavio ? "Dr. Flávio" : "Dr. Bruno"}
     </span>
   );
 }
@@ -385,11 +382,11 @@ function LoginScreen() {
 }
 
 // ---------- Fee breakdown preview ----------
-function FeeBreakdown({ dono, percentualExito, valorEstimado, valorAdministrativo, temSucumbencia, valorSucumbencial }) {
+function FeeBreakdown({ dono, percentualExito, valorEstimado, valorAdministrativo }) {
   const valor = parseNum(valorEstimado);
   const split = computeSplit({ valorTotal: valor, percentualExito, dono, sucumbencial: false });
-  const donoLabel = dono === "Flávio" ? "Dr. Flávio" : "Bruno";
-  const outroLabel = dono === "Flávio" ? "Bruno" : "Dr. Flávio";
+  const donoLabel = dono === "Flávio" ? "Dr. Flávio" : "Dr. Bruno";
+  const outroLabel = dono === "Flávio" ? "Dr. Bruno" : "Dr. Flávio";
   const donoTotal = dono === "Flávio" ? split.flavio : split.bruno;
   const outroTotal = dono === "Flávio" ? split.bruno : split.flavio;
   return (
@@ -404,8 +401,8 @@ function FeeBreakdown({ dono, percentualExito, valorEstimado, valorAdministrativ
           <BreakdownRow label="Base divisível (até 30% do valor)" value={split.baseDivisivel} />
           {split.excedente > 0 && <BreakdownRow label={`Excedente — 100% ${donoLabel}`} value={split.excedente} highlight />}
           <div style={{ height: 1, backgroundColor: "rgba(241,230,200,0.2)", margin: "8px 0" }} />
-          <BreakdownRow label="Escritório (50% do divisível)" value={split.escritorio} bold />
-          <BreakdownRow label={`${donoLabel}, dono do cliente (40% + excedente)`} value={donoTotal} bold />
+          <BreakdownRow label="Escritório (40% do divisível)" value={split.escritorio} bold />
+          <BreakdownRow label={`${donoLabel}, dono do cliente (50% + excedente)`} value={donoTotal} bold />
           <BreakdownRow label={`${outroLabel}, outro sócio (10% do divisível)`} value={outroTotal} bold />
           <BreakdownRow label="Cliente recebe" value={split.cliente} />
         </React.Fragment>
@@ -419,13 +416,28 @@ function FeeBreakdown({ dono, percentualExito, valorEstimado, valorAdministrativ
           <div style={{ fontFamily: FONT_SANS, fontSize: 11.5, color: "#B7C2CE", marginTop: 2 }}>Destino: {administrativoDestino(dono)}</div>
         </React.Fragment>
       )}
-      {temSucumbencia && (
-        <React.Fragment>
-          <div style={{ height: 1, backgroundColor: "rgba(241,230,200,0.2)", margin: "8px 0" }} />
-          {parseNum(valorSucumbencial) > 0 && <BreakdownRow label="Honorários sucumbenciais (estimado)" value={parseNum(valorSucumbencial)} />}
-          <div style={{ fontFamily: FONT_SANS, fontSize: 11.5, color: "#B7C2CE", marginTop: 2 }}>Sucumbenciais são 100% de {donoLabel} — não entram no divisível.</div>
-        </React.Fragment>
+    </div>
+  );
+}
+
+// Valor apartado: não sai do RPV/precatório do benefício, é uma verba própria e separada.
+function SucumbenciaBox({ dono, valorSucumbencial }) {
+  const donoLabel = dono === "Flávio" ? "Dr. Flávio" : "Dr. Bruno";
+  return (
+    <div style={{ backgroundColor: C.blueSoft, border: `1.5px solid ${C.blue}`, borderRadius: 10, padding: 14 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+        <Icon name="scale" size={14} color={C.blue} />
+        <span style={{ fontFamily: FONT_SERIF, fontSize: 12, fontWeight: 700, color: C.blue, textTransform: "uppercase", letterSpacing: "0.06em" }}>Honorários sucumbenciais — valor apartado</span>
+      </div>
+      {parseNum(valorSucumbencial) > 0 && (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+          <span style={{ fontFamily: FONT_SANS, fontSize: 12.5, color: C.blue }}>Valor estimado</span>
+          <span style={{ fontFamily: FONT_MONO, fontSize: 14, fontWeight: 700, color: C.blue }}>{formatBRL(valorSucumbencial)}</span>
+        </div>
       )}
+      <div style={{ fontFamily: FONT_SANS, fontSize: 11.5, color: C.blue, lineHeight: 1.5 }}>
+        100% de {donoLabel}. Essa verba é paga separadamente pelo INSS — não faz parte do valor do RPV/precatório do benefício e não é descontada dele.
+      </div>
     </div>
   );
 }
@@ -489,7 +501,7 @@ function ClientesTab({ clientes, clientForm, setClientForm, onSubmit, editingCli
           </div>
           <div style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "8px 12px", borderRadius: 8, backgroundColor: C.parchmentDark, marginBottom: 12 }}>
             <Icon name="info" size={13} color={C.inkSoft} />
-            <span style={{ fontFamily: FONT_SANS, fontSize: 11.5, color: C.inkSoft }}>Administrativo do Dr. Flávio vai 100% para ele. Administrativo de cliente do Bruno vai 100% para o escritório.</span>
+            <span style={{ fontFamily: FONT_SANS, fontSize: 11.5, color: C.inkSoft }}>Administrativo do Dr. Flávio vai 100% para ele. Administrativo de cliente do Dr. Bruno vai 100% para o escritório.</span>
           </div>
           <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, cursor: "pointer" }}>
             <input type="checkbox" checked={clientForm.temSucumbencia} onChange={(e) => set("temSucumbencia", e.target.checked)} style={{ width: 16, height: 16, accentColor: C.brass }} />
@@ -505,8 +517,14 @@ function ClientesTab({ clientes, clientForm, setClientForm, onSubmit, editingCli
         </div>
 
         <div style={{ marginBottom: 14 }}>
-          <FeeBreakdown dono={clientForm.dono} percentualExito={clientForm.percentualExito} valorEstimado={clientForm.valorEstimado} valorAdministrativo={clientForm.valorAdministrativo} temSucumbencia={clientForm.temSucumbencia} valorSucumbencial={clientForm.valorSucumbencial} />
+          <FeeBreakdown dono={clientForm.dono} percentualExito={clientForm.percentualExito} valorEstimado={clientForm.valorEstimado} valorAdministrativo={clientForm.valorAdministrativo} />
         </div>
+
+        {clientForm.temSucumbencia && (
+          <div style={{ marginBottom: 14 }}>
+            <SucumbenciaBox dono={clientForm.dono} valorSucumbencial={clientForm.valorSucumbencial} />
+          </div>
+        )}
 
         <div style={cardStyle}>
           <span style={sectionLabelStyle}>Observações</span>
@@ -562,11 +580,15 @@ function ClientCard({ cliente, onEdit, confirmingDelete, onAskDelete, onCancelDe
           {cliente.numeroBeneficio && <div style={{ marginTop: 12, fontFamily: FONT_SANS, fontSize: 12.5, color: C.inkSoft }}>NB: <strong style={{ color: C.ink }}>{cliente.numeroBeneficio}</strong></div>}
           {cliente.processo && <div style={{ marginTop: 4, fontFamily: FONT_SANS, fontSize: 12.5, color: C.inkSoft }}>Processo: <strong style={{ color: C.ink, fontFamily: FONT_MONO }}>{cliente.processo}</strong></div>}
           {cliente.valorAdministrativo > 0 && <div style={{ marginTop: 4, fontFamily: FONT_SANS, fontSize: 12.5, color: C.inkSoft }}>Administrativo: <strong style={{ color: C.ink }}>{formatBRL(cliente.valorAdministrativo)}</strong> · {administrativoDestino(cliente.dono)}</div>}
-          {cliente.temSucumbencia && <div style={{ marginTop: 4, fontFamily: FONT_SANS, fontSize: 12.5, color: C.inkSoft }}>Sucumbência{cliente.valorSucumbencial > 0 ? `: ${formatBRL(cliente.valorSucumbencial)}` : ""} · 100% {cliente.dono === "Flávio" ? "Dr. Flávio" : "Bruno"}</div>}
           {cliente.obs && <div style={{ marginTop: 4, fontFamily: FONT_SANS, fontSize: 12.5, color: C.inkSoft, fontStyle: "italic" }}>“{cliente.obs}”</div>}
           <div style={{ marginTop: 12 }}>
-            <FeeBreakdown dono={cliente.dono} percentualExito={cliente.percentualExito} valorEstimado={cliente.valorEstimado} valorAdministrativo={cliente.valorAdministrativo} temSucumbencia={cliente.temSucumbencia} valorSucumbencial={cliente.valorSucumbencial} />
+            <FeeBreakdown dono={cliente.dono} percentualExito={cliente.percentualExito} valorEstimado={cliente.valorEstimado} valorAdministrativo={cliente.valorAdministrativo} />
           </div>
+          {cliente.temSucumbencia && (
+            <div style={{ marginTop: 10 }}>
+              <SucumbenciaBox dono={cliente.dono} valorSucumbencial={cliente.valorSucumbencial} />
+            </div>
+          )}
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 14 }}>
             <button onClick={onEdit} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 12px", borderRadius: 8, border: `1.5px solid ${C.rule}`, backgroundColor: "#fff", color: C.ink, fontFamily: FONT_SANS, fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}><Icon name="pencil" size={13} /> Editar</button>
             {!confirmingDelete ? (
@@ -593,14 +615,14 @@ function AutoRateioPreview({ split }) {
         <LedgerValue label="Escritório" value={split.escritorio} />
         <LedgerValue label="Cliente" value={split.cliente} />
         <LedgerValue label="Dr. Flávio" value={split.flavio} />
-        <LedgerValue label="Bruno" value={split.bruno} />
+        <LedgerValue label="Dr. Bruno" value={split.bruno} />
       </div>
     </div>
   );
 }
 
 // ---------- Novo / Editar Levantamento Tab ----------
-function FormTab({ form, setForm, onSubmit, editingId, onCancelEdit, photoDataUrl, setPhotoDataUrl, photoBusy, fileInputRef, valorInputRef, onPhotoFile, responsaveisConhecidos, clientes, saving, showToast, rateioManual, setRateioManual, lastSaved, onNextEntry, onGeneratePDF }) {
+function FormTab({ form, setForm, onSubmit, editingId, onCancelEdit, photoDataUrl, setPhotoDataUrl, photoBusy, fileInputRef, valorInputRef, onPhotoFile, responsaveisConhecidos, clientes, saving, showToast, rateioManual, setRateioManual, lastSaved, onNextEntry, onGeneratePDF, pdfBusy }) {
   const [showDetails, setShowDetails] = useState(false);
   function set(field, value) { setForm((f) => ({ ...f, [field]: value })); }
   const linkedClient = clientes.find((c) => c.id === form.clienteId) || null;
@@ -617,7 +639,7 @@ function FormTab({ form, setForm, onSubmit, editingId, onCancelEdit, photoDataUr
             <Icon name="check" size={26} color={C.green} strokeWidth={2.5} />
           </div>
           <span style={{ fontFamily: FONT_SERIF, fontSize: 18, fontWeight: 700, color: C.ink }}>Levantamento registrado</span>
-          <span style={{ fontFamily: FONT_SANS, fontSize: 13, color: C.inkSoft, marginTop: 4 }}>O PDF do comprovante deve abrir automaticamente para você salvar ou imprimir.</span>
+          <span style={{ fontFamily: FONT_SANS, fontSize: 13, color: C.inkSoft, marginTop: 4 }}>Toque no botão abaixo para gerar o PDF do comprovante e enviar direto pelo WhatsApp, e-mail, ou salvar no aparelho.</span>
           <div style={{ width: "100%", marginTop: 16, backgroundColor: C.parchmentDark, borderRadius: 10, padding: 14, textAlign: "left" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
               <span style={{ fontFamily: FONT_SERIF, fontSize: 15, fontWeight: 700, color: C.ink }}>{lastSaved.cliente}</span>
@@ -627,8 +649,8 @@ function FormTab({ form, setForm, onSubmit, editingId, onCancelEdit, photoDataUr
             <div style={{ fontFamily: FONT_MONO, fontSize: 20, fontWeight: 700, color: C.ink, marginTop: 6 }}>{formatBRL(lastSaved.valorTotal)}</div>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 8, width: "100%", marginTop: 16 }}>
-            <button onClick={() => onGeneratePDF(lastSaved)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: C.ink, color: "#fff", fontFamily: FONT_SANS, fontSize: 14.5, fontWeight: 700, padding: 13, borderRadius: 10, border: "none", cursor: "pointer" }}>
-              <Icon name="printer" size={16} /> Gerar PDF novamente
+            <button onClick={() => onGeneratePDF(lastSaved)} disabled={pdfBusy} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: C.ink, color: "#fff", fontFamily: FONT_SANS, fontSize: 14.5, fontWeight: 700, padding: 13, borderRadius: 10, border: "none", cursor: pdfBusy ? "default" : "pointer", opacity: pdfBusy ? 0.7 : 1 }}>
+              {pdfBusy ? <Spinner size={16} /> : <Icon name="printer" size={16} />} {pdfBusy ? "Gerando PDF..." : "Compartilhar / baixar PDF"}
             </button>
             <button onClick={onNextEntry} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: "#fff", color: C.ink, fontFamily: FONT_SANS, fontSize: 14.5, fontWeight: 700, padding: 13, borderRadius: 10, border: `1.5px solid ${C.rule}`, cursor: "pointer" }}>
               <Icon name="arrowRight" size={16} /> Registrar próximo cliente
@@ -711,7 +733,7 @@ function FormTab({ form, setForm, onSubmit, editingId, onCancelEdit, photoDataUr
         {linkedClient && (
           <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
             <input type="checkbox" checked={form.sucumbencial} onChange={(e) => set("sucumbencial", e.target.checked)} style={{ width: 16, height: 16, accentColor: C.brass }} />
-            <span style={{ fontFamily: FONT_SANS, fontSize: 12.5, color: C.ink }}>Honorários sucumbenciais (100% {linkedClient.dono === "Flávio" ? "Dr. Flávio" : "Bruno"})</span>
+            <span style={{ fontFamily: FONT_SANS, fontSize: 12.5, color: C.ink }}>Honorários sucumbenciais (100% {linkedClient.dono === "Flávio" ? "Dr. Flávio" : "Dr. Bruno"})</span>
           </label>
         )}
       </div>
@@ -754,7 +776,7 @@ function FormTab({ form, setForm, onSubmit, editingId, onCancelEdit, photoDataUr
               <Field label="Escritório"><MoneyInput value={form.valorEscritorio} onChange={(e) => set("valorEscritorio", e.target.value)} /></Field>
               <Field label="Cliente"><MoneyInput value={form.valorCliente} onChange={(e) => set("valorCliente", e.target.value)} /></Field>
               <Field label="Dr. Flávio"><MoneyInput value={form.valorFlavio} onChange={(e) => set("valorFlavio", e.target.value)} /></Field>
-              <Field label="Bruno (honorários)"><MoneyInput value={form.valorBruno} onChange={(e) => set("valorBruno", e.target.value)} /></Field>
+              <Field label="Dr. Bruno (honorários)"><MoneyInput value={form.valorBruno} onChange={(e) => set("valorBruno", e.target.value)} /></Field>
             </div>
             {form.valorTotal && (
               <div style={{ marginTop: 4, padding: "8px 12px", borderRadius: 8, display: "flex", alignItems: "flex-start", gap: 8, backgroundColor: showDiffWarning ? C.redSoft : C.greenSoft, border: `1px solid ${showDiffWarning ? C.red : C.green}` }}>
@@ -790,7 +812,7 @@ function FormTab({ form, setForm, onSubmit, editingId, onCancelEdit, photoDataUr
 }
 
 // ---------- Histórico Tab ----------
-function HistoricoTab({ entries, pendentesCount, totalPendente, onEdit, onDelete, onGeneratePDF }) {
+function HistoricoTab({ entries, pendentesCount, totalPendente, onEdit, onDelete, onGeneratePDF, pdfBusy }) {
   const [expandedId, setExpandedId] = useState(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   if (entries.length === 0) return <EmptyState title="Nenhum levantamento registrado" text="Toque em “Novo” para registrar o primeiro levantamento de RPV." />;
@@ -803,7 +825,7 @@ function HistoricoTab({ entries, pendentesCount, totalPendente, onEdit, onDelete
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         {entries.map((en, i) => (
           <EntryCard key={en.id} entry={en} index={entries.length - i} expanded={expandedId === en.id} onToggle={() => setExpandedId(expandedId === en.id ? null : en.id)}
-            onEdit={() => onEdit(en)} onGeneratePDF={() => onGeneratePDF(en)} confirmingDelete={confirmDeleteId === en.id}
+            onEdit={() => onEdit(en)} onGeneratePDF={() => onGeneratePDF(en)} pdfBusy={pdfBusy} confirmingDelete={confirmDeleteId === en.id}
             onAskDelete={() => setConfirmDeleteId(en.id)} onCancelDelete={() => setConfirmDeleteId(null)}
             onConfirmDelete={() => { onDelete(en.id); setConfirmDeleteId(null); }} />
         ))}
@@ -812,7 +834,7 @@ function HistoricoTab({ entries, pendentesCount, totalPendente, onEdit, onDelete
   );
 }
 
-function EntryCard({ entry, index, expanded, onToggle, onEdit, onGeneratePDF, confirmingDelete, onAskDelete, onCancelDelete, onConfirmDelete }) {
+function EntryCard({ entry, index, expanded, onToggle, onEdit, onGeneratePDF, pdfBusy, confirmingDelete, onAskDelete, onCancelDelete, onConfirmDelete }) {
   return (
     <div style={{ backgroundColor: C.card, border: `1px solid ${C.ruleSoft}`, borderLeft: `4px solid ${C.brass}`, borderRadius: 10, overflow: "hidden" }}>
       <button onClick={onToggle} style={{ width: "100%", textAlign: "left", padding: "12px 14px", display: "flex", alignItems: "flex-start", gap: 12, background: "none", border: "none", cursor: "pointer" }}>
@@ -840,7 +862,7 @@ function EntryCard({ entry, index, expanded, onToggle, onEdit, onGeneratePDF, co
             <LedgerValue label="Escritório" value={entry.valorEscritorio} />
             <LedgerValue label="Cliente" value={entry.valorCliente} />
             <LedgerValue label="Dr. Flávio" value={entry.valorFlavio} />
-            <LedgerValue label="Bruno" value={entry.valorBruno} />
+            <LedgerValue label="Dr. Bruno" value={entry.valorBruno} />
           </div>
           <div style={{ marginTop: 10, fontFamily: FONT_SANS, fontSize: 12.5, color: C.inkSoft }}>Responsável pelo levantamento: <strong style={{ color: C.ink }}>{entry.responsavel}</strong></div>
           {entry.obs && <div style={{ marginTop: 4, fontFamily: FONT_SANS, fontSize: 12.5, color: C.inkSoft, fontStyle: "italic" }}>“{entry.obs}”</div>}
@@ -850,7 +872,9 @@ function EntryCard({ entry, index, expanded, onToggle, onEdit, onGeneratePDF, co
             </div>
           )}
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
-            <button onClick={onGeneratePDF} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 12px", borderRadius: 8, border: `1.5px solid ${C.brass}`, backgroundColor: C.brassSoft, color: C.brassDark, fontFamily: FONT_SANS, fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}><Icon name="printer" size={13} /> PDF</button>
+            <button onClick={onGeneratePDF} disabled={pdfBusy} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 12px", borderRadius: 8, border: `1.5px solid ${C.brass}`, backgroundColor: C.brassSoft, color: C.brassDark, fontFamily: FONT_SANS, fontSize: 12.5, fontWeight: 700, cursor: pdfBusy ? "default" : "pointer", opacity: pdfBusy ? 0.6 : 1 }}>
+              {pdfBusy ? <Spinner size={13} color={C.brassDark} /> : <Icon name="printer" size={13} />} PDF
+            </button>
             <button onClick={onEdit} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 12px", borderRadius: 8, border: `1.5px solid ${C.rule}`, backgroundColor: "#fff", color: C.ink, fontFamily: FONT_SANS, fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}><Icon name="pencil" size={13} /> Editar</button>
             {!confirmingDelete ? (
               <button onClick={onAskDelete} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 12px", borderRadius: 8, border: `1.5px solid ${C.redSoft}`, backgroundColor: "#fff", color: C.red, fontFamily: FONT_SANS, fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}><Icon name="trash" size={13} /> Excluir</button>
@@ -878,7 +902,7 @@ function LedgerValue({ label, value }) {
 }
 
 // ---------- Relatório Tab ----------
-function RelatorioTab({ entries, onMarkSent, showToast, onGeneratePDF }) {
+function RelatorioTab({ entries, onMarkSent, showToast, onGeneratePDF, pdfBusy }) {
   const [dataInicio, setDataInicio] = useState("");
   const [dataFim, setDataFim] = useState("");
   const [apenasPendentes, setApenasPendentes] = useState(true);
@@ -907,7 +931,7 @@ function RelatorioTab({ entries, onMarkSent, showToast, onGeneratePDF }) {
       `${i + 1}. ${en.cliente} — Proc. ${en.processo}${en.sucumbencial ? " (honorários sucumbenciais)" : ""}\n` +
       `   Banco: ${BANCOS[en.banco] ? BANCOS[en.banco].short : en.banco} | Data: ${formatDateBR(en.dataLevantamento)} | Responsável: ${en.responsavel}\n` +
       `   Valor total: ${formatBRL(en.valorTotal)}\n` +
-      `   Escritório: ${formatBRL(en.valorEscritorio)} | Cliente: ${formatBRL(en.valorCliente)} | Dr. Flávio: ${formatBRL(en.valorFlavio)} | Bruno (honorários): ${formatBRL(en.valorBruno)}` +
+      `   Escritório: ${formatBRL(en.valorEscritorio)} | Cliente: ${formatBRL(en.valorCliente)} | Dr. Flávio: ${formatBRL(en.valorFlavio)} | Dr. Bruno (honorários): ${formatBRL(en.valorBruno)}` +
       (en.obs ? `\n   Obs: ${en.obs}` : "")
     )).join("\n\n");
     return (
@@ -915,7 +939,7 @@ function RelatorioTab({ entries, onMarkSent, showToast, onGeneratePDF }) {
       `Gerado em ${formatDateBR(todayISO())} · Período: ${periodoLabel}\n` +
       `${lista.length} levantamento(s)\n\n${linhas || "(nenhum registro selecionado)"}\n\n————————————————————\nTOTAIS\n` +
       `Valor total levantado: ${formatBRL(totals.total)}\nEscritório: ${formatBRL(totals.escritorio)}\nCliente: ${formatBRL(totals.cliente)}\n` +
-      `Dr. Flávio: ${formatBRL(totals.flavio)}\nBruno (honorários): ${formatBRL(totals.bruno)}`
+      `Dr. Flávio: ${formatBRL(totals.flavio)}\nDr. Bruno (honorários): ${formatBRL(totals.bruno)}`
     );
   }
 
@@ -967,7 +991,7 @@ function RelatorioTab({ entries, onMarkSent, showToast, onGeneratePDF }) {
               <TotalRow label="Escritório" value={totals.escritorio} />
               <TotalRow label="Cliente" value={totals.cliente} />
               <TotalRow label="Dr. Flávio" value={totals.flavio} />
-              <TotalRow label="Bruno (honorários)" value={totals.bruno} />
+              <TotalRow label="Dr. Bruno (honorários)" value={totals.bruno} />
             </div>
           </div>
 
@@ -975,8 +999,8 @@ function RelatorioTab({ entries, onMarkSent, showToast, onGeneratePDF }) {
             <button onClick={copyReport} disabled={lista.length === 0} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: C.ink, color: "#fff", fontFamily: FONT_SANS, fontSize: 13.5, fontWeight: 700, padding: 13, borderRadius: 10, border: "none", cursor: lista.length === 0 ? "default" : "pointer", opacity: lista.length === 0 ? 0.5 : 1 }}>
               <Icon name="copy" size={15} /> Copiar texto
             </button>
-            <button onClick={() => onGeneratePDF(lista, totals, periodoLabel)} disabled={lista.length === 0} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: "#fff", color: C.ink, fontFamily: FONT_SANS, fontSize: 13.5, fontWeight: 700, padding: 13, borderRadius: 10, border: `1.5px solid ${C.rule}`, cursor: lista.length === 0 ? "default" : "pointer", opacity: lista.length === 0 ? 0.5 : 1 }}>
-              <Icon name="printer" size={15} /> Baixar PDF
+            <button onClick={() => onGeneratePDF(lista, totals, periodoLabel)} disabled={lista.length === 0 || pdfBusy} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: "#fff", color: C.ink, fontFamily: FONT_SANS, fontSize: 13.5, fontWeight: 700, padding: 13, borderRadius: 10, border: `1.5px solid ${C.rule}`, cursor: (lista.length === 0 || pdfBusy) ? "default" : "pointer", opacity: (lista.length === 0 || pdfBusy) ? 0.5 : 1 }}>
+              {pdfBusy ? <Spinner size={15} color={C.ink} /> : <Icon name="printer" size={15} />} {pdfBusy ? "Gerando..." : "Baixar PDF"}
             </button>
           </div>
 
@@ -1009,105 +1033,185 @@ function TotalRow({ label, value, strong }) {
   );
 }
 
-// ---------- Print / PDF sheet ----------
-const printInk = "#1F2C3D", printBrass = "#7C611F", printRule = "#C9BCA0";
-function PrintSheet({ data }) { return data.type === "single" ? <SinglePrintSheet {...data} /> : <BatchPrintSheet {...data} />; }
-function PrintHeader({ subtitle }) {
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 12, borderBottom: `2px solid ${printInk}`, paddingBottom: 12, marginBottom: 18 }}>
-      <LogoMark size={44} />
-      <div>
-        <div style={{ fontFamily: FONT_SANS, fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: printBrass }}>Rezende Maia Advocacia</div>
-        <div style={{ fontFamily: FONT_SERIF, fontSize: 19, fontWeight: 700, color: printInk }}>{subtitle}</div>
-      </div>
-    </div>
-  );
+// ---------- PDF generation (real PDF file — works identically on iPhone, iPad and computer) ----------
+const PDF_INK = [31, 44, 61];
+const PDF_BRASS = [124, 97, 31];
+const PDF_SOFT = [90, 107, 125];
+const PDF_BRASS_BG = [241, 230, 200];
+
+function pdfHeader(doc, subtitle) {
+  doc.setFont("times", "bold");
+  doc.setFontSize(10);
+  doc.setTextColor(...PDF_BRASS);
+  doc.text("REZENDE MAIA ADVOCACIA", 40, 46);
+  doc.setFontSize(17);
+  doc.setTextColor(...PDF_INK);
+  doc.text(subtitle, 40, 66);
+  doc.setDrawColor(...PDF_INK);
+  doc.setLineWidth(1);
+  doc.line(40, 76, 555, 76);
+  return 100;
 }
-function PrintRow({ label, value, mono }) {
-  return (
-    <tr>
-      <td style={{ padding: "5px 10px 5px 0", fontFamily: FONT_SANS, fontSize: 11.5, color: "#5A6B7D", whiteSpace: "nowrap", verticalAlign: "top" }}>{label}</td>
-      <td style={{ padding: "5px 0", fontFamily: mono ? FONT_MONO : FONT_SANS, fontSize: 12.5, color: printInk, fontWeight: 600 }}>{value}</td>
-    </tr>
-  );
+function pdfFooter(doc) {
+  const pageCount = doc.internal.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(138, 147, 160);
+    doc.text(`Documento interno gerado pelo Controle de RPV — Rezende Maia Advocacia em ${nowLabel()}.`, 40, 810);
+  }
 }
-function SinglePrintSheet({ entry, cliente, photo }) {
-  return (
-    <div className="print-sheet" style={{ fontFamily: FONT_SANS, color: printInk, padding: 8 }}>
-      <PrintHeader subtitle="Comprovante de Levantamento de RPV" />
-      <table style={{ borderCollapse: "collapse", width: "100%", marginBottom: 16 }}><tbody>
-        <PrintRow label="Cliente" value={entry.cliente} />
-        {cliente && cliente.cpf && <PrintRow label="CPF" value={cliente.cpf} mono />}
-        {cliente && cliente.numeroBeneficio && <PrintRow label="Nº do benefício" value={cliente.numeroBeneficio} mono />}
-        <PrintRow label="Nº do processo" value={entry.processo} mono />
-        <PrintRow label="Dono do cliente" value={entry.donoCliente === "Flávio" ? "Dr. Flávio" : "Bruno"} />
-      </tbody></table>
-      <table style={{ borderCollapse: "collapse", width: "100%", marginBottom: 16 }}><tbody>
-        <PrintRow label="Banco" value={BANCOS[entry.banco] ? BANCOS[entry.banco].label : entry.banco} />
-        <PrintRow label="Data do levantamento" value={formatDateBR(entry.dataLevantamento)} />
-        <PrintRow label="Responsável" value={entry.responsavel} />
-        <PrintRow label="Valor total levantado" value={formatBRL(entry.valorTotal)} mono />
-        {entry.sucumbencial && <PrintRow label="Natureza" value="Honorários sucumbenciais (100% do dono do cliente)" />}
-      </tbody></table>
-      <div style={{ fontFamily: FONT_SERIF, fontSize: 12.5, fontWeight: 700, color: printBrass, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8 }}>Rateio</div>
-      <table style={{ borderCollapse: "collapse", width: "100%", marginBottom: 18, border: `1px solid ${printRule}` }}>
-        <thead><tr style={{ backgroundColor: "#F1E6C8" }}>
-          <th style={{ textAlign: "left", padding: "6px 10px", fontFamily: FONT_SANS, fontSize: 11, color: printBrass, fontWeight: 700 }}>Destinatário</th>
-          <th style={{ textAlign: "right", padding: "6px 10px", fontFamily: FONT_SANS, fontSize: 11, color: printBrass, fontWeight: 700 }}>Valor</th>
-        </tr></thead>
-        <tbody>
-          {[["Escritório", entry.valorEscritorio], ["Cliente", entry.valorCliente], ["Dr. Flávio", entry.valorFlavio], ["Bruno (honorários)", entry.valorBruno]].map(([label, value]) => (
-            <tr key={label} style={{ borderTop: `1px solid ${printRule}` }}>
-              <td style={{ padding: "6px 10px", fontFamily: FONT_SANS, fontSize: 12 }}>{label}</td>
-              <td style={{ padding: "6px 10px", fontFamily: FONT_MONO, fontSize: 12, textAlign: "right", fontWeight: 600 }}>{formatBRL(value)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      {entry.obs && (<div style={{ marginBottom: 16 }}><div style={{ fontFamily: FONT_SANS, fontSize: 11, fontWeight: 700, color: "#5A6B7D", textTransform: "uppercase" }}>Observações</div><div style={{ fontFamily: FONT_SANS, fontSize: 12.5, marginTop: 3 }}>{entry.obs}</div></div>)}
-      {photo && (<div style={{ marginBottom: 16 }}><div style={{ fontFamily: FONT_SANS, fontSize: 11, fontWeight: 700, color: "#5A6B7D", textTransform: "uppercase", marginBottom: 6 }}>Comprovante emitido pelo banco</div><img src={photo} alt="Comprovante" style={{ maxWidth: "70%", border: `1px solid ${printRule}`, borderRadius: 4 }} /></div>)}
-      <div style={{ borderTop: `1px solid ${printRule}`, paddingTop: 8, marginTop: 12, fontFamily: FONT_SANS, fontSize: 10, color: "#8A93A0" }}>Documento interno gerado pelo Controle de RPV — Rezende Maia Advocacia em {nowLabel()}.</div>
-    </div>
-  );
+function pdfInfoTable(doc, y, rows) {
+  doc.autoTable({
+    startY: y,
+    body: rows,
+    theme: "plain",
+    styles: { font: "helvetica", fontSize: 10, cellPadding: 3, textColor: PDF_INK },
+    columnStyles: { 0: { fontStyle: "bold", textColor: PDF_SOFT, cellWidth: 140 } },
+    margin: { left: 40, right: 40 },
+  });
+  return doc.lastAutoTable.finalY + 14;
 }
-function BatchPrintSheet({ list, totals, periodoLabel }) {
-  return (
-    <div className="print-sheet" style={{ fontFamily: FONT_SANS, color: printInk, padding: 8 }}>
-      <PrintHeader subtitle="Relatório de Levantamento de RPV" />
-      <div style={{ fontFamily: FONT_SANS, fontSize: 12, color: "#5A6B7D", marginBottom: 14 }}>Gerado em {formatDateBR(todayISO())} · Período: {periodoLabel} · {list.length} levantamento(s)</div>
-      <table style={{ borderCollapse: "collapse", width: "100%", border: `1px solid ${printRule}`, marginBottom: 18 }}>
-        <thead><tr style={{ backgroundColor: "#F1E6C8" }}>
-          {["Cliente", "Processo", "Banco", "Data", "Responsável", "Total", "Escritório", "Cliente", "Dr. Flávio", "Bruno"].map((h) => (
-            <th key={h} style={{ textAlign: "left", padding: "6px 8px", fontFamily: FONT_SANS, fontSize: 10, color: printBrass, fontWeight: 700, whiteSpace: "nowrap" }}>{h}</th>
-          ))}
-        </tr></thead>
-        <tbody>
-          {list.map((en) => (
-            <tr key={en.id} style={{ borderTop: `1px solid ${printRule}` }}>
-              <td style={{ padding: "6px 8px", fontFamily: FONT_SANS, fontSize: 10.5 }}>{en.cliente}</td>
-              <td style={{ padding: "6px 8px", fontFamily: FONT_MONO, fontSize: 9.5 }}>{en.processo}</td>
-              <td style={{ padding: "6px 8px", fontFamily: FONT_SANS, fontSize: 10.5 }}>{BANCOS[en.banco] ? BANCOS[en.banco].short : en.banco}</td>
-              <td style={{ padding: "6px 8px", fontFamily: FONT_SANS, fontSize: 10.5, whiteSpace: "nowrap" }}>{formatDateBR(en.dataLevantamento)}</td>
-              <td style={{ padding: "6px 8px", fontFamily: FONT_SANS, fontSize: 10.5 }}>{en.responsavel}</td>
-              <td style={{ padding: "6px 8px", fontFamily: FONT_MONO, fontSize: 10.5, textAlign: "right" }}>{formatBRL(en.valorTotal)}</td>
-              <td style={{ padding: "6px 8px", fontFamily: FONT_MONO, fontSize: 10.5, textAlign: "right" }}>{formatBRL(en.valorEscritorio)}</td>
-              <td style={{ padding: "6px 8px", fontFamily: FONT_MONO, fontSize: 10.5, textAlign: "right" }}>{formatBRL(en.valorCliente)}</td>
-              <td style={{ padding: "6px 8px", fontFamily: FONT_MONO, fontSize: 10.5, textAlign: "right" }}>{formatBRL(en.valorFlavio)}</td>
-              <td style={{ padding: "6px 8px", fontFamily: FONT_MONO, fontSize: 10.5, textAlign: "right" }}>{formatBRL(en.valorBruno)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      <table style={{ borderCollapse: "collapse", width: "60%", marginLeft: "auto" }}><tbody>
-        <PrintRow label="Valor total levantado" value={formatBRL(totals.total)} mono />
-        <PrintRow label="Escritório" value={formatBRL(totals.escritorio)} mono />
-        <PrintRow label="Cliente" value={formatBRL(totals.cliente)} mono />
-        <PrintRow label="Dr. Flávio" value={formatBRL(totals.flavio)} mono />
-        <PrintRow label="Bruno (honorários)" value={formatBRL(totals.bruno)} mono />
-      </tbody></table>
-      <div style={{ borderTop: `1px solid ${printRule}`, paddingTop: 8, marginTop: 20, fontFamily: FONT_SANS, fontSize: 10, color: "#8A93A0" }}>Documento interno gerado pelo Controle de RPV — Rezende Maia Advocacia em {nowLabel()}.</div>
-    </div>
-  );
+
+function buildSinglePdfBlob(entry, cliente, photo) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: "pt", format: "a4" });
+  let y = pdfHeader(doc, "Comprovante de Levantamento de RPV");
+
+  const clientRows = [["Cliente", entry.cliente]];
+  if (cliente && cliente.cpf) clientRows.push(["CPF", cliente.cpf]);
+  if (cliente && cliente.numeroBeneficio) clientRows.push(["Nº do benefício", cliente.numeroBeneficio]);
+  clientRows.push(["Nº do processo", entry.processo]);
+  clientRows.push(["Dono do cliente", entry.donoCliente === "Flávio" ? "Dr. Flávio" : "Dr. Bruno"]);
+  y = pdfInfoTable(doc, y, clientRows);
+
+  const levRows = [
+    ["Banco", BANCOS[entry.banco] ? BANCOS[entry.banco].label : entry.banco],
+    ["Data do levantamento", formatDateBR(entry.dataLevantamento)],
+    ["Responsável", entry.responsavel],
+    ["Valor total levantado", formatBRL(entry.valorTotal)],
+  ];
+  if (entry.sucumbencial) levRows.push(["Natureza", "Honorários sucumbenciais (100% do dono do cliente)"]);
+  y = pdfInfoTable(doc, y, levRows);
+
+  doc.setFont("times", "bold");
+  doc.setFontSize(11);
+  doc.setTextColor(...PDF_BRASS);
+  doc.text("RATEIO", 40, y);
+  y += 6;
+  doc.autoTable({
+    startY: y,
+    head: [["Destinatário", "Valor"]],
+    body: [
+      ["Escritório", formatBRL(entry.valorEscritorio)],
+      ["Cliente", formatBRL(entry.valorCliente)],
+      ["Dr. Flávio", formatBRL(entry.valorFlavio)],
+      ["Dr. Bruno (honorários)", formatBRL(entry.valorBruno)],
+    ],
+    styles: { font: "helvetica", fontSize: 10, cellPadding: 6, textColor: PDF_INK },
+    headStyles: { fillColor: PDF_BRASS_BG, textColor: PDF_BRASS, fontStyle: "bold" },
+    columnStyles: { 1: { halign: "right" } },
+    margin: { left: 40, right: 40 },
+  });
+  y = doc.lastAutoTable.finalY + 18;
+
+  if (entry.obs) {
+    doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.setTextColor(...PDF_SOFT);
+    doc.text("OBSERVAÇÕES", 40, y); y += 14;
+    doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.setTextColor(...PDF_INK);
+    const lines = doc.splitTextToSize(entry.obs, 500);
+    doc.text(lines, 40, y); y += lines.length * 13 + 10;
+  }
+
+  if (photo) {
+    try {
+      if (y > 620) { doc.addPage(); y = 60; }
+      const props = doc.getImageProperties(photo);
+      const w = 240;
+      const h = (props.height / props.width) * w;
+      doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.setTextColor(...PDF_SOFT);
+      doc.text("COMPROVANTE EMITIDO PELO BANCO", 40, y); y += 12;
+      doc.addImage(photo, "JPEG", 40, y, w, h);
+    } catch (e) { /* imagem inválida — ignora silenciosamente */ }
+  }
+
+  pdfFooter(doc);
+  return doc.output("blob");
+}
+
+function buildBatchPdfBlob(list, totals, periodoLabel) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: "pt", format: "a4", orientation: "landscape" });
+  let y = pdfHeader(doc, "Relatório de Levantamento de RPV");
+
+  doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.setTextColor(...PDF_SOFT);
+  doc.text(`Gerado em ${formatDateBR(todayISO())} · Período: ${periodoLabel} · ${list.length} levantamento(s)`, 40, y);
+  y += 16;
+
+  doc.autoTable({
+    startY: y,
+    head: [["Cliente", "Processo", "Banco", "Data", "Responsável", "Total", "Escritório", "Cliente", "Dr. Flávio", "Dr. Bruno"]],
+    body: list.map((en) => [
+      en.cliente,
+      en.processo,
+      BANCOS[en.banco] ? BANCOS[en.banco].short : en.banco,
+      formatDateBR(en.dataLevantamento),
+      en.responsavel,
+      formatBRL(en.valorTotal),
+      formatBRL(en.valorEscritorio),
+      formatBRL(en.valorCliente),
+      formatBRL(en.valorFlavio),
+      formatBRL(en.valorBruno),
+    ]),
+    styles: { font: "helvetica", fontSize: 8.5, cellPadding: 5, textColor: PDF_INK },
+    headStyles: { fillColor: PDF_BRASS_BG, textColor: PDF_BRASS, fontStyle: "bold" },
+    columnStyles: { 5: { halign: "right" }, 6: { halign: "right" }, 7: { halign: "right" }, 8: { halign: "right" }, 9: { halign: "right" } },
+    margin: { left: 40, right: 40 },
+  });
+  y = doc.lastAutoTable.finalY + 16;
+
+  doc.autoTable({
+    startY: y,
+    body: [
+      ["Valor total levantado", formatBRL(totals.total)],
+      ["Escritório", formatBRL(totals.escritorio)],
+      ["Cliente", formatBRL(totals.cliente)],
+      ["Dr. Flávio", formatBRL(totals.flavio)],
+      ["Dr. Bruno (honorários)", formatBRL(totals.bruno)],
+    ],
+    theme: "plain",
+    styles: { font: "helvetica", fontSize: 10, cellPadding: 3, textColor: PDF_INK },
+    columnStyles: { 0: { fontStyle: "bold", textColor: PDF_SOFT, cellWidth: 180 }, 1: { fontStyle: "bold" } },
+    margin: { left: 40 },
+    tableWidth: 260,
+  });
+
+  pdfFooter(doc);
+  return doc.output("blob");
+}
+
+async function sharePdfBlob(blob, filename, showToast) {
+  try {
+    const file = new File([blob], filename, { type: "application/pdf" });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file], title: filename });
+      return;
+    }
+  } catch (err) {
+    if (err && err.name === "AbortError") return; // usuário cancelou o compartilhamento
+    // se o compartilhamento falhar por outro motivo, cai no download abaixo
+  }
+  try {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 30000);
+    if (showToast) showToast("PDF baixado. Verifique a pasta de downloads ou o app Arquivos.");
+  } catch (err) {
+    if (showToast) showToast("Não foi possível gerar o PDF neste navegador.", "error");
+  }
 }
 
 // ---------- Main App ----------
@@ -1132,8 +1236,7 @@ function RPVLedgerApp() {
   const [clientForm, setClientForm] = useState(EMPTY_CLIENT_FORM);
   const [editingClienteId, setEditingClienteId] = useState(null);
   const [savingCliente, setSavingCliente] = useState(false);
-
-  const [printData, setPrintData] = useState(null);
+  const [pdfBusy, setPdfBusy] = useState(false);
 
   useEffect(() => {
     const unsub = auth.onAuthStateChanged((u) => setUser(u || null));
@@ -1153,18 +1256,6 @@ function RPVLedgerApp() {
     );
     return () => { unsubEntries(); unsubClientes(); };
   }, [user]);
-
-  useEffect(() => {
-    if (!printData) return;
-    const t = setTimeout(() => window.print(), 250);
-    return () => clearTimeout(t);
-  }, [printData]);
-
-  useEffect(() => {
-    function onAfterPrint() { setPrintData(null); }
-    window.addEventListener("afterprint", onAfterPrint);
-    return () => window.removeEventListener("afterprint", onAfterPrint);
-  }, []);
 
   function showToast(msg, type) {
     setToast({ msg, type: type || "success" });
@@ -1242,7 +1333,7 @@ function RPVLedgerApp() {
 
     setSaving(false);
     if (editingId) { showToast("Levantamento atualizado."); resetForm(); setTab("historico"); }
-    else { showToast("Levantamento registrado. Gerando PDF..."); setLastSaved(entry); setPrintData({ type: "single", entry, cliente: linkedClient, photo: photoDataUrl }); }
+    else { showToast("Levantamento registrado."); setLastSaved(entry); }
   }
 
   async function handleDelete(id) {
@@ -1260,12 +1351,30 @@ function RPVLedgerApp() {
     } catch (err) { showToast("Erro ao marcar como enviado: " + err.message, "error"); }
   }
 
-  function generateSinglePDF(entry, preloadedPhoto) {
+  async function generateSinglePDF(entry, preloadedPhoto) {
     const cliente = clientes.find((c) => c.id === entry.clienteId) || null;
     const photo = preloadedPhoto !== undefined ? preloadedPhoto : entry.foto || null;
-    setPrintData({ type: "single", entry, cliente, photo });
+    setPdfBusy(true);
+    try {
+      const blob = buildSinglePdfBlob(entry, cliente, photo);
+      const filename = `RPV-${entry.cliente}-${entry.dataLevantamento}.pdf`.replace(/[^\w.\- ]/g, "");
+      await sharePdfBlob(blob, filename, showToast);
+    } catch (err) {
+      showToast("Erro ao gerar o PDF: " + err.message, "error");
+    }
+    setPdfBusy(false);
   }
-  function generateBatchPDF(list, totals, periodoLabel) { setPrintData({ type: "batch", list, totals, periodoLabel }); }
+  async function generateBatchPDF(list, totals, periodoLabel) {
+    setPdfBusy(true);
+    try {
+      const blob = buildBatchPdfBlob(list, totals, periodoLabel);
+      const filename = `Relatorio-RPV-${todayISO()}.pdf`;
+      await sharePdfBlob(blob, filename, showToast);
+    } catch (err) {
+      showToast("Erro ao gerar o PDF: " + err.message, "error");
+    }
+    setPdfBusy(false);
+  }
 
   function resetClientForm() { setClientForm(EMPTY_CLIENT_FORM); setEditingClienteId(null); }
   function startEditCliente(cliente) {
@@ -1346,11 +1455,11 @@ function RPVLedgerApp() {
             photoDataUrl={photoDataUrl} setPhotoDataUrl={setPhotoDataUrl} photoBusy={photoBusy} fileInputRef={fileInputRef} valorInputRef={valorInputRef}
             onPhotoFile={handlePhotoFile} responsaveisConhecidos={responsaveisConhecidos} clientes={clientes} saving={saving} showToast={showToast}
             rateioManual={rateioManual} setRateioManual={setRateioManual} lastSaved={lastSaved} onNextEntry={nextEntry}
-            onGeneratePDF={(entry) => generateSinglePDF(entry, photoDataUrl)} />
+            onGeneratePDF={(entry) => generateSinglePDF(entry, photoDataUrl)} pdfBusy={pdfBusy} />
         ) : tab === "historico" ? (
-          <HistoricoTab entries={entries} pendentesCount={pendentes.length} totalPendente={totalPendente} onEdit={startEdit} onDelete={handleDelete} onGeneratePDF={(entry) => generateSinglePDF(entry)} />
+          <HistoricoTab entries={entries} pendentesCount={pendentes.length} totalPendente={totalPendente} onEdit={startEdit} onDelete={handleDelete} onGeneratePDF={(entry) => generateSinglePDF(entry)} pdfBusy={pdfBusy} />
         ) : (
-          <RelatorioTab entries={entries} onMarkSent={markAsSent} showToast={showToast} onGeneratePDF={generateBatchPDF} />
+          <RelatorioTab entries={entries} onMarkSent={markAsSent} showToast={showToast} onGeneratePDF={generateBatchPDF} pdfBusy={pdfBusy} />
         )}
       </main>
 
@@ -1362,8 +1471,6 @@ function RPVLedgerApp() {
         <NavButton active={tab === "historico"} icon={<Icon name="clipboard" size={19} />} label="Histórico" badge={pendentes.length > 0 ? pendentes.length : null} onClick={() => setTab("historico")} />
         <NavButton active={tab === "relatorio"} icon={<Icon name="send" size={18} />} label="Relatório" onClick={() => setTab("relatorio")} />
       </nav>
-
-      {printData && <PrintSheet data={printData} />}
     </div>
   );
 }
