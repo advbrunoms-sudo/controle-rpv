@@ -1496,6 +1496,15 @@ root.render(FIREBASE_READY ? <RPVLedgerApp /> : <SetupScreen />);
 <script>
   if (window.__FIREBASE_CONFIG__ && window.__FIREBASE_CONFIG__.apiKey.indexOf("COLOQUE_AQUI") === -1) {
     if ("serviceWorker" in navigator) {
+      // Quando uma versão nova do app assume o controle, recarrega a página
+      // automaticamente uma vez para exibir a atualização (evita ficar
+      // "preso" numa versão antiga em cache).
+      let alreadyReloaded = false;
+      navigator.serviceWorker.addEventListener("controllerchange", () => {
+        if (alreadyReloaded) return;
+        alreadyReloaded = true;
+        window.location.reload();
+      });
       window.addEventListener("load", () => {
         navigator.serviceWorker.register("./sw.js").catch(() => {});
       });
