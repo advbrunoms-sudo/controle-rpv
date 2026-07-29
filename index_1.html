@@ -1,0 +1,1625 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+<title>Controle de RPV — Rezende Maia Advocacia</title>
+
+<link rel="manifest" href="./manifest.json" />
+<link rel="apple-touch-icon" href="./apple-touch-icon.png" />
+<link rel="icon" href="./icon-192.png" />
+<meta name="theme-color" content="#1F2C3D" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Controle RPV" />
+<meta name="mobile-web-app-capable" content="yes" />
+
+<!-- React -->
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone@7/babel.min.js" crossorigin></script>
+
+<!-- Firebase (compat SDK — simplest to use without a build step) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
+<!-- PDF generation (real PDF file, shared/downloaded directly — works the same on iPhone, iPad and computer) -->
+<script src="https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://unpkg.com/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.js"></script>
+
+<style>
+  html, body { margin: 0; padding: 0; background: #F6F1E7; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  input:focus, select:focus, textarea:focus, button:focus {
+    outline: none;
+    border-color: #9C7A32 !important;
+    box-shadow: 0 0 0 3px #F1E6C8;
+  }
+  ::placeholder { color: #B7AD98; }
+  .spinner {
+    display: inline-block; width: 1em; height: 1em;
+    border: 2px solid rgba(255,255,255,0.35); border-top-color: #fff;
+    border-radius: 999px; animation: rpv-spin 0.7s linear infinite;
+  }
+  @keyframes rpv-spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script>
+  // ------------------------------------------------------------------
+  // CONFIGURAÇÃO DO FIREBASE — EDITE AQUI
+  // Pegue esses valores em: console.firebase.google.com > seu projeto >
+  // ⚙️ Configurações do projeto > seus apps > SDK setup and configuration
+  // ------------------------------------------------------------------
+  window.__FIREBASE_CONFIG__ = {
+    apiKey: "AIzaSyAWcwHAFLTLQ1fW2G94hAfuD4zN34ecQ2A",
+  authDomain: "controlerpv-9a502.firebaseapp.com",
+  projectId: "controlerpv-9a502",
+  storageBucket: "controlerpv-9a502.firebasestorage.app",
+  messagingSenderId: "633816371066",
+  appId: "1:633816371066:web:f7b7d804b0ee8c1e1e50c3"
+  };
+</script>
+
+<script type="text/babel" data-presets="env,react">
+const { useState, useEffect, useRef, useMemo } = React;
+
+// ---------- Firebase setup ----------
+const FIREBASE_CONFIG = window.__FIREBASE_CONFIG__;
+const FIREBASE_READY = FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.apiKey.indexOf("COLOQUE_AQUI") === -1;
+
+let auth = null;
+let db = null;
+if (FIREBASE_READY) {
+  firebase.initializeApp(FIREBASE_CONFIG);
+  auth = firebase.auth();
+  db = firebase.firestore();
+  db.enablePersistence({ synchronizeTabs: true }).catch(() => {});
+}
+
+// ---------- Tokens ----------
+const C = {
+  ink: "#1F2C3D", inkSoft: "#4A5A6E", parchment: "#F6F1E7", parchmentDark: "#EEE6D4",
+  card: "#FFFDF8", rule: "#DCD2BC", ruleSoft: "#E9E1D0", brass: "#9C7A32", brassDark: "#7C611F",
+  brassSoft: "#F1E6C8", green: "#3C6E52", greenSoft: "#E4EFE8", red: "#A23E24", redSoft: "#F5E4DE",
+  blue: "#2C4A6E", blueSoft: "#E6ECF2", cef: "#0033A0", cefAccent: "#F7941D", bb: "#003087", bbAccent: "#FFCC00",
+};
+const FONT_SERIF = '"Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif';
+const FONT_SANS = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+const FONT_MONO = 'ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace';
+
+// ---------- Icons (inline SVG, no external dependency) ----------
+const ICON_PATHS = {
+  check: <polyline points="20 6 9 17 4 12" />,
+  x: <g><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></g>,
+  plus: <g><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></g>,
+  camera: <g><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" /><circle cx="12" cy="13" r="4" /></g>,
+  trash: <g><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /></g>,
+  pencil: <path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />,
+  chevronDown: <polyline points="6 9 12 15 18 9" />,
+  chevronUp: <polyline points="18 15 12 9 6 15" />,
+  alert: <g><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></g>,
+  send: <g><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></g>,
+  clipboard: <g><path d="M9 2h6a1 1 0 0 1 1 1v2H8V3a1 1 0 0 1 1-1z" /><rect x="5" y="4" width="14" height="18" rx="2" /><line x1="9" y1="11" x2="15" y2="11" /><line x1="9" y1="15" x2="15" y2="15" /></g>,
+  copy: <g><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></g>,
+  users: <g><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></g>,
+  userPlus: <g><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="8.5" cy="7" r="4" /><line x1="20" y1="8" x2="20" y2="14" /><line x1="17" y1="11" x2="23" y2="11" /></g>,
+  scale: <g><line x1="12" y1="3" x2="12" y2="21" /><path d="M5 8L2 13a3 3 0 0 0 6 0z" /><path d="M19 8l-3 5a3 3 0 0 0 6 0z" /><path d="M5 8h14" /><path d="M9 21h6" /></g>,
+  info: <g><circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" /></g>,
+  printer: <g><polyline points="6 9 6 2 18 2 18 9" /><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" /><rect x="6" y="14" width="12" height="8" /></g>,
+  arrowRight: <g><line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" /></g>,
+  logout: <g><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></g>,
+};
+function Icon({ name, size = 18, color = "currentColor", strokeWidth = 2 }) {
+  const inner = ICON_PATHS[name];
+  if (!inner) return null;
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+      {inner}
+    </svg>
+  );
+}
+function Spinner({ color = "#fff", size = 16 }) {
+  return <span className="spinner" style={{ width: size, height: size, borderTopColor: color, borderColor: color + "55" }} />;
+}
+
+// ---------- Helpers ----------
+function todayISO() { return new Date().toISOString().slice(0, 10); }
+function nowLabel() {
+  const d = new Date();
+  return `${formatDateBR(d.toISOString().slice(0, 10))} às ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+function formatDateBR(iso) {
+  if (!iso) return "—";
+  const parts = iso.split("-");
+  if (parts.length !== 3) return iso;
+  const [y, m, d] = parts;
+  return `${d}/${m}/${y}`;
+}
+function formatBRL(v) {
+  const n = Number(v) || 0;
+  return n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+function formatPct(v) {
+  const n = Number(v) || 0;
+  return `${n.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}%`;
+}
+function parseNum(v) { const n = parseFloat(v); return isNaN(n) ? 0 : n; }
+function newId(prefix) { return (prefix || "id") + "_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8); }
+function maskCPF(value) {
+  const digits = String(value).replace(/\D/g, "").slice(0, 11);
+  if (digits.length > 9) return digits.replace(/(\d{3})(\d{3})(\d{3})(\d{1,2})/, "$1.$2.$3-$4");
+  if (digits.length > 6) return digits.replace(/(\d{3})(\d{3})(\d{1,3})/, "$1.$2.$3");
+  if (digits.length > 3) return digits.replace(/(\d{3})(\d{1,3})/, "$1.$2");
+  return digits;
+}
+function compressImage(file, maxW = 1000, quality = 0.7) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("Falha ao ler arquivo"));
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onerror = () => reject(new Error("Falha ao carregar imagem"));
+      img.onload = () => {
+        const scale = Math.min(1, maxW / img.width);
+        const w = Math.max(1, Math.round(img.width * scale));
+        const h = Math.max(1, Math.round(img.height * scale));
+        const canvas = document.createElement("canvas");
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, w, h);
+        ctx.drawImage(img, 0, 0, w, h);
+        let q = quality;
+        let dataUrl = canvas.toDataURL("image/jpeg", q);
+        let tries = 0;
+        while (dataUrl.length > 700000 && tries < 6) {
+          q = Math.max(0.3, q - 0.12);
+          dataUrl = canvas.toDataURL("image/jpeg", q);
+          tries++;
+        }
+        resolve(dataUrl);
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+function readFileAsDataURL(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("Falha ao ler arquivo"));
+    reader.onload = (e) => resolve(e.target.result);
+    reader.readAsDataURL(file);
+  });
+}
+function isPdfDataUrl(url) {
+  return typeof url === "string" && url.indexOf("data:application/pdf") === 0;
+}
+function dataUrlToBlob(dataUrl) {
+  const [meta, base64] = dataUrl.split(",");
+  const mimeMatch = meta.match(/data:(.*?);base64/);
+  const mime = mimeMatch ? mimeMatch[1] : "application/octet-stream";
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return new Blob([bytes], { type: mime });
+}
+const MAX_PDF_BYTES = 700 * 1024;
+
+const BANCOS = {
+  CEF: { label: "Caixa Econômica Federal", short: "CEF", color: C.cef, accent: C.cefAccent },
+  BB: { label: "Banco do Brasil", short: "BB", color: C.bb, accent: C.bbAccent },
+};
+const DONOS = { Bruno: { label: "Dr. Bruno" }, "Flávio": { label: "Dr. Flávio" } };
+
+function computeSplit({ valorTotal, percentualExito, dono, sucumbencial, valorAdministrativo, valorGastos }) {
+  const total = Number(valorTotal) || 0;
+  const donoIsBruno = dono === "Bruno";
+  if (sucumbencial) {
+    return { escritorio: 0, cliente: 0, flavio: donoIsBruno ? 0 : total, bruno: donoIsBruno ? total : 0, honorarioTotal: total, baseDivisivel: 0, excedente: total, administrativoAplicado: 0, gastosAplicado: 0 };
+  }
+  const pct = (Number(percentualExito) || 0) / 100;
+  const honorarioTotal = total * pct;
+  const baseDivisivel = Math.min(honorarioTotal, total * 0.3);
+  const excedente = Math.max(0, honorarioTotal - baseDivisivel);
+  let escritorio = baseDivisivel * 0.4;
+  let donoShare = baseDivisivel * 0.5 + excedente;
+  const outroShare = baseDivisivel * 0.1;
+
+  // Valor administrativo: sai do que sobraria para o cliente e vai integralmente
+  // para o escritório (cliente do Bruno) ou para o Dr. Flávio (cliente dele).
+  let restante = Math.max(0, total - honorarioTotal);
+  const administrativoAplicado = Math.min(Math.max(0, Number(valorAdministrativo) || 0), restante);
+  if (donoIsBruno) escritorio += administrativoAplicado;
+  else donoShare += administrativoAplicado;
+  restante -= administrativoAplicado;
+
+  // Gastos reembolsáveis: dinheiro que o escritório já adiantou pelo cliente.
+  // Sai do que sobraria para o cliente e volta integralmente para o escritório,
+  // independentemente de quem é o dono do cliente.
+  const gastosAplicado = Math.min(Math.max(0, Number(valorGastos) || 0), restante);
+  escritorio += gastosAplicado;
+  restante -= gastosAplicado;
+
+  const clienteValor = restante;
+  return {
+    escritorio, cliente: clienteValor,
+    flavio: donoIsBruno ? outroShare : donoShare,
+    bruno: donoIsBruno ? donoShare : outroShare,
+    honorarioTotal, baseDivisivel, excedente, administrativoAplicado, gastosAplicado,
+  };
+}
+function administrativoDestino(dono) { return dono === "Flávio" ? "Dr. Flávio (integral)" : "Escritório (integral)"; }
+
+const EMPTY_FORM = {
+  clienteId: "", cliente: "", processo: "", banco: "CEF", dataLevantamento: todayISO(), responsavel: "",
+  valorTotal: "", valorEscritorio: "", valorCliente: "", valorFlavio: "", valorBruno: "", sucumbencial: false, obs: "",
+};
+const EMPTY_CLIENT_FORM = {
+  dataCadastro: todayISO(), nome: "", cpf: "", numeroBeneficio: "", processo: "", valorEstimado: "",
+  dono: "Bruno", percentualExito: "30", valorAdministrativo: "", gastosReembolsaveis: "", temSucumbencia: false, valorSucumbencial: "", obs: "",
+};
+
+// ---------- Small UI atoms ----------
+function LogoMark({ size = 40 }) {
+  return (
+    <img
+      src="./logo-mark.png"
+      alt="Rezende Maia Advocacia"
+      width={size}
+      height={size}
+      style={{ flexShrink: 0, width: size, height: size, borderRadius: "50%", objectFit: "contain" }}
+    />
+  );
+}
+function BankBadge({ banco }) {
+  const b = BANCOS[banco] || BANCOS.CEF;
+  return (
+    <span className="inline-flex items-center gap-1 px-2 py-1 rounded" style={{ display: "inline-flex", alignItems: "center", gap: 4, backgroundColor: b.color, color: "#fff", fontFamily: FONT_SANS, fontSize: "11px", fontWeight: 700, letterSpacing: "0.04em", padding: "4px 8px", borderRadius: 6 }}>
+      <span style={{ width: 6, height: 6, borderRadius: 999, backgroundColor: b.accent }} />
+      {b.short}
+    </span>
+  );
+}
+function DonoBadge({ dono }) {
+  const isFlavio = dono === "Flávio";
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", backgroundColor: isFlavio ? C.blueSoft : C.brassSoft, color: isFlavio ? C.blue : C.brassDark, fontFamily: FONT_SANS, fontSize: "11px", fontWeight: 700, letterSpacing: "0.03em", padding: "4px 8px", borderRadius: 6 }}>
+      {isFlavio ? "Dr. Flávio" : "Dr. Bruno"}
+    </span>
+  );
+}
+function StatusStamp({ enviado }) {
+  const color = enviado ? C.green : C.brass;
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "2px 8px", borderRadius: 6, border: `1.5px solid ${color}`, color: enviado ? C.green : C.brassDark, fontFamily: FONT_SERIF, fontSize: "11px", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", transform: enviado ? "rotate(-2deg)" : "none" }}>
+      {enviado && <Icon name="check" size={11} strokeWidth={3} />} {enviado ? "Enviado" : "Pendente"}
+    </span>
+  );
+}
+function Toast({ toast }) {
+  if (!toast) return null;
+  const isError = toast.type === "error";
+  return (
+    <div style={{ position: "fixed", left: "50%", bottom: 88, transform: "translateX(-50%)", zIndex: 50, padding: "12px 16px", borderRadius: 10, backgroundColor: isError ? C.red : C.ink, color: "#fff", fontFamily: FONT_SANS, fontSize: "13.5px", maxWidth: "88%", textAlign: "center", boxShadow: "0 8px 20px rgba(0,0,0,0.25)" }}>
+      {toast.msg}
+    </div>
+  );
+}
+function Field({ label, required, children, hint }) {
+  return (
+    <label style={{ display: "block", marginBottom: 14 }}>
+      <span style={{ fontFamily: FONT_SANS, fontSize: "11.5px", fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", color: C.inkSoft }}>
+        {label}{required && <span style={{ color: C.red }}> *</span>}
+      </span>
+      <div style={{ marginTop: 6 }}>{children}</div>
+      {hint && <span style={{ fontFamily: FONT_SANS, fontSize: "11.5px", color: C.inkSoft }}>{hint}</span>}
+    </label>
+  );
+}
+const inputBase = { width: "100%", boxSizing: "border-box", padding: "10px 12px", borderRadius: 8, border: `1.5px solid ${C.rule}`, backgroundColor: "#fff", fontFamily: FONT_SANS, fontSize: "15px", color: C.ink, outline: "none" };
+function TextInput(props) { return <input {...props} style={{ ...inputBase, ...(props.style || {}) }} />; }
+function MoneyInput({ value, onChange, placeholder, inputRef, big }) {
+  return (
+    <div style={{ position: "relative" }}>
+      <span style={{ position: "absolute", left: big ? 14 : 12, top: "50%", transform: "translateY(-50%)", fontFamily: FONT_SANS, fontSize: big ? "17px" : "14px", color: C.inkSoft, fontWeight: 700 }}>R$</span>
+      <input ref={inputRef} type="number" inputMode="decimal" step="0.01" min="0" value={value} onChange={onChange} placeholder={placeholder || "0,00"}
+        style={{ ...inputBase, paddingLeft: big ? 40 : 34, fontFamily: FONT_MONO, fontVariantNumeric: "tabular-nums", fontSize: big ? "22px" : "15px", fontWeight: big ? 700 : 400, padding: big ? "16px 14px 16px 40px" : inputBase.padding }} />
+    </div>
+  );
+}
+const cardStyle = { backgroundColor: C.card, border: `1px solid ${C.ruleSoft}`, borderRadius: 12, padding: 16, marginBottom: 14 };
+const sectionLabelStyle = { fontFamily: FONT_SERIF, fontSize: "13px", fontWeight: 700, color: C.brassDark, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10, display: "block" };
+function EmptyState({ title, text }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", padding: "80px 24px" }}>
+      <Icon name="clipboard" size={30} color={C.rule} />
+      <span style={{ fontFamily: FONT_SERIF, fontSize: "16px", fontWeight: 700, color: C.ink, marginTop: 12 }}>{title}</span>
+      <span style={{ fontFamily: FONT_SANS, fontSize: "13px", color: C.inkSoft, marginTop: 6, maxWidth: 260 }}>{text}</span>
+    </div>
+  );
+}
+const flexRow = { display: "flex" };
+const gridTwo = { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 };
+
+// ---------- Setup screen (Firebase not configured) ----------
+function SetupScreen() {
+  return (
+    <div style={{ minHeight: "100vh", backgroundColor: C.parchment, display: "flex", alignItems: "center", justifyContent: "center", padding: 24, fontFamily: FONT_SANS }}>
+      <div style={{ maxWidth: 420, backgroundColor: C.card, border: `1px solid ${C.ruleSoft}`, borderRadius: 14, padding: 26 }}>
+        <LogoMark size={40} />
+        <h1 style={{ fontFamily: FONT_SERIF, fontSize: 20, color: C.ink, marginTop: 12 }}>Configuração pendente</h1>
+        <p style={{ fontSize: 14, color: C.inkSoft, lineHeight: 1.6 }}>
+          Este app ainda não está ligado a um projeto do Firebase. Abra o arquivo <code>index.html</code>, encontre o bloco
+          <code> window.__FIREBASE_CONFIG__ </code> perto do topo e substitua pelos valores do seu projeto
+          (console.firebase.google.com → Configurações do projeto → seus apps).
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ---------- Login ----------
+function LoginScreen() {
+  const [email, setEmail] = useState("");
+  const [senha, setSenha] = useState("");
+  const [erro, setErro] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  async function handleLogin(e) {
+    e.preventDefault();
+    setErro("");
+    setLoading(true);
+    try {
+      await auth.signInWithEmailAndPassword(email.trim(), senha);
+    } catch (err) {
+      const msgs = {
+        "auth/invalid-email": "E-mail inválido.",
+        "auth/user-not-found": "Usuário não encontrado. Peça para o administrador criar seu acesso no Firebase.",
+        "auth/wrong-password": "Senha incorreta.",
+        "auth/invalid-credential": "E-mail ou senha incorretos.",
+        "auth/too-many-requests": "Muitas tentativas. Aguarde um momento e tente de novo.",
+      };
+      setErro(msgs[err.code] || "Não foi possível entrar. Confira o e-mail e a senha.");
+    }
+    setLoading(false);
+  }
+
+  return (
+    <div style={{ minHeight: "100vh", backgroundColor: C.ink, display: "flex", alignItems: "center", justifyContent: "center", padding: 24, fontFamily: FONT_SANS }}>
+      <form onSubmit={handleLogin} style={{ width: "100%", maxWidth: 340 }}>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: 26 }}>
+          <LogoMark size={54} />
+          <span style={{ fontFamily: FONT_SANS, fontSize: 11, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: C.brassSoft, marginTop: 12 }}>Rezende Maia Advocacia</span>
+          <h1 style={{ fontFamily: FONT_SERIF, fontSize: 22, color: "#fff", marginTop: 2 }}>Controle de RPV</h1>
+        </div>
+        <div style={{ backgroundColor: "#28394E", borderRadius: 12, padding: 18 }}>
+          <Field label="E-mail">
+            <TextInput type="email" autoCapitalize="none" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="seuemail@exemplo.com" required />
+          </Field>
+          <Field label="Senha">
+            <TextInput type="password" value={senha} onChange={(e) => setSenha(e.target.value)} placeholder="••••••••" required />
+          </Field>
+          {erro && (
+            <div style={{ backgroundColor: C.redSoft, border: `1px solid ${C.red}`, borderRadius: 8, padding: "8px 10px", marginBottom: 10 }}>
+              <span style={{ fontFamily: FONT_SANS, fontSize: 12.5, color: C.red }}>{erro}</span>
+            </div>
+          )}
+          <button type="submit" disabled={loading} style={{ width: "100%", backgroundColor: C.brass, color: "#fff", fontFamily: FONT_SANS, fontSize: 15, fontWeight: 700, padding: "13px", borderRadius: 9, border: "none", cursor: loading ? "default" : "pointer", opacity: loading ? 0.75 : 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+            {loading && <Spinner size={16} />} Entrar
+          </button>
+        </div>
+        <p style={{ fontFamily: FONT_SANS, fontSize: 11.5, color: "#8A9AAC", textAlign: "center", marginTop: 14 }}>
+          Acesso restrito à equipe do escritório. Contas são criadas pelo administrador no painel do Firebase.
+        </p>
+      </form>
+    </div>
+  );
+}
+
+// ---------- Fee breakdown preview ----------
+function FeeBreakdown({ dono, percentualExito, valorEstimado, valorAdministrativo, valorGastos }) {
+  const valor = parseNum(valorEstimado);
+  const split = computeSplit({ valorTotal: valor, percentualExito, dono, sucumbencial: false, valorAdministrativo, valorGastos });
+  const donoLabel = dono === "Flávio" ? "Dr. Flávio" : "Dr. Bruno";
+  const outroLabel = dono === "Flávio" ? "Dr. Bruno" : "Dr. Flávio";
+  const donoTotal = dono === "Flávio" ? split.flavio : split.bruno;
+  const outroTotal = dono === "Flávio" ? split.bruno : split.flavio;
+  const donoIsBrunoLocal = dono === "Bruno";
+  return (
+    <div style={{ backgroundColor: C.ink, borderRadius: 10, padding: 14 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+        <Icon name="scale" size={14} color={C.brassSoft} />
+        <span style={{ fontFamily: FONT_SERIF, fontSize: 12, fontWeight: 700, color: C.brassSoft, textTransform: "uppercase", letterSpacing: "0.06em" }}>Como ficam os honorários</span>
+      </div>
+      {valor > 0 ? (
+        <React.Fragment>
+          <BreakdownRow label={`Honorário total (${formatPct(percentualExito)} de ${formatBRL(valor)})`} value={split.honorarioTotal} />
+          <BreakdownRow label="Base divisível (até 30% do valor)" value={split.baseDivisivel} />
+          {split.excedente > 0 && <BreakdownRow label={`Excedente — 100% ${donoLabel}`} value={split.excedente} highlight />}
+          <div style={{ height: 1, backgroundColor: "rgba(241,230,200,0.2)", margin: "8px 0" }} />
+          <BreakdownRow label="Escritório (40% do divisível)" value={split.escritorio} bold />
+          <BreakdownRow label={`${donoLabel}, dono do cliente (50% + excedente)`} value={donoTotal} bold />
+          <BreakdownRow label={`${outroLabel}, outro sócio (10% do divisível)`} value={outroTotal} bold />
+          <BreakdownRow label="Cliente recebe" value={split.cliente} />
+          {(split.administrativoAplicado > 0 || split.gastosAplicado > 0) && (
+            <div style={{ marginTop: 6 }}>
+              {split.administrativoAplicado > 0 && (
+                <div style={{ fontFamily: FONT_SANS, fontSize: 11.5, color: "#B7C2CE", lineHeight: 1.5 }}>
+                  Já inclui {formatBRL(split.administrativoAplicado)} de valor administrativo, descontado do cliente e somado {donoIsBrunoLocal ? "ao escritório" : `a ${donoLabel}`} acima.
+                </div>
+              )}
+              {split.gastosAplicado > 0 && (
+                <div style={{ fontFamily: FONT_SANS, fontSize: 11.5, color: "#B7C2CE", lineHeight: 1.5, marginTop: split.administrativoAplicado > 0 ? 4 : 0 }}>
+                  Já inclui {formatBRL(split.gastosAplicado)} de gastos reembolsáveis, descontados do cliente e somados ao escritório acima.
+                </div>
+              )}
+            </div>
+          )}
+        </React.Fragment>
+      ) : (
+        <span style={{ fontFamily: FONT_SANS, fontSize: 12, color: "#B7C2CE" }}>Informe o valor do RPV/precatório expedido para ver a simulação do rateio.</span>
+      )}
+    </div>
+  );
+}
+
+// Valor apartado: não sai do RPV/precatório do benefício, é uma verba própria e separada.
+function SucumbenciaBox({ dono, valorSucumbencial }) {
+  const donoLabel = dono === "Flávio" ? "Dr. Flávio" : "Dr. Bruno";
+  return (
+    <div style={{ backgroundColor: C.blueSoft, border: `1.5px solid ${C.blue}`, borderRadius: 10, padding: 14 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+        <Icon name="scale" size={14} color={C.blue} />
+        <span style={{ fontFamily: FONT_SERIF, fontSize: 12, fontWeight: 700, color: C.blue, textTransform: "uppercase", letterSpacing: "0.06em" }}>Honorários sucumbenciais — valor apartado</span>
+      </div>
+      {parseNum(valorSucumbencial) > 0 && (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+          <span style={{ fontFamily: FONT_SANS, fontSize: 12.5, color: C.blue }}>Valor estimado</span>
+          <span style={{ fontFamily: FONT_MONO, fontSize: 14, fontWeight: 700, color: C.blue }}>{formatBRL(valorSucumbencial)}</span>
+        </div>
+      )}
+      <div style={{ fontFamily: FONT_SANS, fontSize: 11.5, color: C.blue, lineHeight: 1.5 }}>
+        100% de {donoLabel}. Essa verba é paga separadamente pelo INSS — não faz parte do valor do RPV/precatório do benefício e não é descontada dele.
+      </div>
+    </div>
+  );
+}
+function BreakdownRow({ label, value, bold, highlight }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "2px 0" }}>
+      <span style={{ fontFamily: FONT_SANS, fontSize: 12, color: highlight ? C.bbAccent : bold ? "#fff" : "#B7C2CE" }}>{label}</span>
+      <span style={{ fontFamily: FONT_MONO, fontSize: bold ? "13.5px" : "12px", fontWeight: bold ? 700 : 500, color: highlight ? C.bbAccent : bold ? C.brassSoft : "#DDE3E9", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>{formatBRL(value)}</span>
+    </div>
+  );
+}
+
+// ---------- Clientes Tab ----------
+function ClientesTab({ clientes, clientForm, setClientForm, onSubmit, editingClienteId, onCancelEdit, onEdit, onDelete, saving }) {
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  function set(field, value) { setClientForm((f) => ({ ...f, [field]: value })); }
+
+  return (
+    <div>
+      <form onSubmit={onSubmit}>
+        {editingClienteId && (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, padding: "8px 12px", borderRadius: 8, backgroundColor: C.brassSoft, border: `1px solid ${C.brass}` }}>
+            <span style={{ fontFamily: FONT_SANS, fontSize: 12.5, color: C.brassDark, fontWeight: 600 }}>Editando cadastro existente</span>
+            <button type="button" onClick={onCancelEdit} style={{ background: "none", border: "none", color: C.brassDark, cursor: "pointer" }}><Icon name="x" size={16} /></button>
+          </div>
+        )}
+
+        <div style={cardStyle}>
+          <span style={sectionLabelStyle}>Dados do cliente</span>
+          <div style={gridTwo}>
+            <Field label="Data de cadastro"><TextInput type="date" value={clientForm.dataCadastro} onChange={(e) => set("dataCadastro", e.target.value)} /></Field>
+            <Field label="CPF"><TextInput value={clientForm.cpf} onChange={(e) => set("cpf", maskCPF(e.target.value))} placeholder="000.000.000-00" inputMode="numeric" style={{ fontFamily: FONT_MONO, fontSize: 14 }} /></Field>
+          </div>
+          <Field label="Nome completo" required><TextInput value={clientForm.nome} onChange={(e) => set("nome", e.target.value)} placeholder="Nome do cliente" /></Field>
+          <div style={gridTwo}>
+            <Field label="Número do benefício (NB)"><TextInput value={clientForm.numeroBeneficio} onChange={(e) => set("numeroBeneficio", e.target.value)} placeholder="000.000.000-0" style={{ fontFamily: FONT_MONO, fontSize: 14 }} /></Field>
+            <Field label="Nº do processo"><TextInput value={clientForm.processo} onChange={(e) => set("processo", e.target.value)} placeholder="0000000-00.0000..." style={{ fontFamily: FONT_MONO, fontSize: 13 }} /></Field>
+          </div>
+          <Field label="Valor do RPV / precatório expedido"><MoneyInput value={clientForm.valorEstimado} onChange={(e) => set("valorEstimado", e.target.value)} /></Field>
+          <Field label="Dono do cliente" required>
+            <div style={{ display: "flex", gap: 8 }}>
+              {Object.keys(DONOS).map((key) => (
+                <button type="button" key={key} onClick={() => set("dono", key)} style={{ flex: 1, padding: "10px 0", borderRadius: 8, border: `1.5px solid ${clientForm.dono === key ? C.ink : C.rule}`, backgroundColor: clientForm.dono === key ? C.ink : "#fff", color: clientForm.dono === key ? "#fff" : C.ink, fontFamily: FONT_SANS, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>
+                  {DONOS[key].label}
+                </button>
+              ))}
+            </div>
+          </Field>
+        </div>
+
+        <div style={cardStyle}>
+          <span style={sectionLabelStyle}>Valores a serem cobrados</span>
+          <div style={gridTwo}>
+            <Field label="Percentual do êxito" required hint="Padrão do escritório: 30%">
+              <div style={{ position: "relative" }}>
+                <input type="number" inputMode="decimal" step="0.5" min="0" max="100" value={clientForm.percentualExito} onChange={(e) => set("percentualExito", e.target.value)} style={{ ...inputBase, paddingRight: 30, fontFamily: FONT_MONO }} />
+                <span style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", color: C.inkSoft, fontSize: 14, fontWeight: 600 }}>%</span>
+              </div>
+            </Field>
+            <Field label="Valor administrativo"><MoneyInput value={clientForm.valorAdministrativo} onChange={(e) => set("valorAdministrativo", e.target.value)} /></Field>
+          </div>
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "8px 12px", borderRadius: 8, backgroundColor: C.parchmentDark, marginBottom: 12 }}>
+            <Icon name="info" size={13} color={C.inkSoft} />
+            <span style={{ fontFamily: FONT_SANS, fontSize: 11.5, color: C.inkSoft }}>Administrativo do Dr. Flávio vai 100% para ele. Administrativo de cliente do Dr. Bruno vai 100% para o escritório.</span>
+          </div>
+
+          <Field label="Gastos reembolsáveis">
+            <MoneyInput value={clientForm.gastosReembolsaveis} onChange={(e) => set("gastosReembolsaveis", e.target.value)} />
+          </Field>
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "8px 12px", borderRadius: 8, backgroundColor: C.parchmentDark, marginBottom: 12 }}>
+            <Icon name="info" size={13} color={C.inkSoft} />
+            <span style={{ fontFamily: FONT_SANS, fontSize: 11.5, color: C.inkSoft }}>Gastos que o escritório adiantou pelo cliente (perícia, deslocamento, etc.). Ao sair o RPV/precatório, esse valor é descontado do cliente e volta integralmente para o escritório.</span>
+          </div>
+
+          <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, cursor: "pointer" }}>
+            <input type="checkbox" checked={clientForm.temSucumbencia} onChange={(e) => set("temSucumbencia", e.target.checked)} style={{ width: 16, height: 16, accentColor: C.brass }} />
+            <span style={{ fontFamily: FONT_SANS, fontSize: 13, color: C.ink }}>Possui honorários sucumbenciais</span>
+          </label>
+          {clientForm.temSucumbencia && (
+            <div style={{ marginTop: 8 }}>
+              <Field label="Valor estimado da sucumbência" hint="100% do advogado dono do cliente — não entra no divisível">
+                <MoneyInput value={clientForm.valorSucumbencial} onChange={(e) => set("valorSucumbencial", e.target.value)} />
+              </Field>
+            </div>
+          )}
+        </div>
+
+        <div style={{ marginBottom: 14 }}>
+          <FeeBreakdown dono={clientForm.dono} percentualExito={clientForm.percentualExito} valorEstimado={clientForm.valorEstimado} valorAdministrativo={clientForm.valorAdministrativo} valorGastos={clientForm.gastosReembolsaveis} />
+        </div>
+
+        {clientForm.temSucumbencia && (
+          <div style={{ marginBottom: 14 }}>
+            <SucumbenciaBox dono={clientForm.dono} valorSucumbencial={clientForm.valorSucumbencial} />
+          </div>
+        )}
+
+        <div style={cardStyle}>
+          <span style={sectionLabelStyle}>Observações</span>
+          <textarea value={clientForm.obs} onChange={(e) => set("obs", e.target.value)} placeholder="Opcional" rows={2} style={{ ...inputBase, resize: "vertical", fontFamily: FONT_SANS }} />
+        </div>
+
+        <button type="submit" disabled={saving} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: C.ink, color: "#fff", fontFamily: FONT_SANS, fontSize: 15, fontWeight: 700, padding: 14, borderRadius: 10, border: "none", cursor: saving ? "default" : "pointer", opacity: saving ? 0.7 : 1, marginBottom: 24 }}>
+          {saving ? <Spinner size={17} /> : <Icon name="userPlus" size={17} />}
+          {editingClienteId ? "Salvar alterações" : "Cadastrar cliente"}
+        </button>
+      </form>
+
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+        <Icon name="users" size={15} color={C.brassDark} />
+        <span style={{ fontFamily: FONT_SERIF, fontSize: 13, fontWeight: 700, color: C.brassDark, textTransform: "uppercase", letterSpacing: "0.06em" }}>Clientes cadastrados ({clientes.length})</span>
+      </div>
+
+      {clientes.length === 0 ? (
+        <EmptyState title="Nenhum cliente cadastrado" text="Cadastre o cliente com antecedência para agilizar o levantamento no banco." />
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 16 }}>
+          {clientes.map((c) => (
+            <ClientCard key={c.id} cliente={c} onEdit={() => onEdit(c)} confirmingDelete={confirmDeleteId === c.id}
+              onAskDelete={() => setConfirmDeleteId(c.id)} onCancelDelete={() => setConfirmDeleteId(null)}
+              onConfirmDelete={() => { onDelete(c.id); setConfirmDeleteId(null); }} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ClientCard({ cliente, onEdit, confirmingDelete, onAskDelete, onCancelDelete, onConfirmDelete }) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <div style={{ backgroundColor: C.card, border: `1px solid ${C.ruleSoft}`, borderLeft: `4px solid ${cliente.dono === "Flávio" ? C.blue : C.brass}`, borderRadius: 10, overflow: "hidden" }}>
+      <button onClick={() => setExpanded((s) => !s)} style={{ width: "100%", textAlign: "left", padding: "12px 14px", display: "flex", alignItems: "flex-start", gap: 12, background: "none", border: "none", cursor: "pointer" }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <span style={{ fontFamily: FONT_SERIF, fontSize: 15, fontWeight: 700, color: C.ink }}>{cliente.nome}</span>
+            <DonoBadge dono={cliente.dono} />
+          </div>
+          {cliente.cpf && <div style={{ fontFamily: FONT_MONO, fontSize: 11.5, color: C.inkSoft, marginTop: 2 }}>{cliente.cpf}</div>}
+          <div style={{ fontFamily: FONT_SANS, fontSize: 11.5, color: C.inkSoft, marginTop: 3 }}>Cadastrado em {formatDateBR(cliente.dataCadastro)} · Êxito {formatPct(cliente.percentualExito)}</div>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+          <span style={{ fontFamily: FONT_MONO, fontSize: 14, fontWeight: 700, color: C.ink }}>{formatBRL(cliente.valorEstimado)}</span>
+          <Icon name={expanded ? "chevronUp" : "chevronDown"} size={16} color={C.inkSoft} />
+        </div>
+      </button>
+      {expanded && (
+        <div style={{ padding: "0 14px 14px", borderTop: `1px dashed ${C.ruleSoft}` }}>
+          {cliente.numeroBeneficio && <div style={{ marginTop: 12, fontFamily: FONT_SANS, fontSize: 12.5, color: C.inkSoft }}>NB: <strong style={{ color: C.ink }}>{cliente.numeroBeneficio}</strong></div>}
+          {cliente.processo && <div style={{ marginTop: 4, fontFamily: FONT_SANS, fontSize: 12.5, color: C.inkSoft }}>Processo: <strong style={{ color: C.ink, fontFamily: FONT_MONO }}>{cliente.processo}</strong></div>}
+          {cliente.valorAdministrativo > 0 && <div style={{ marginTop: 4, fontFamily: FONT_SANS, fontSize: 12.5, color: C.inkSoft }}>Administrativo: <strong style={{ color: C.ink }}>{formatBRL(cliente.valorAdministrativo)}</strong> · {administrativoDestino(cliente.dono)}</div>}
+          {cliente.gastosReembolsaveis > 0 && <div style={{ marginTop: 4, fontFamily: FONT_SANS, fontSize: 12.5, color: C.inkSoft }}>Gastos reembolsáveis: <strong style={{ color: C.ink }}>{formatBRL(cliente.gastosReembolsaveis)}</strong> · voltam para o escritório</div>}
+          {cliente.obs && <div style={{ marginTop: 4, fontFamily: FONT_SANS, fontSize: 12.5, color: C.inkSoft, fontStyle: "italic" }}>“{cliente.obs}”</div>}
+          <div style={{ marginTop: 12 }}>
+            <FeeBreakdown dono={cliente.dono} percentualExito={cliente.percentualExito} valorEstimado={cliente.valorEstimado} valorAdministrativo={cliente.valorAdministrativo} valorGastos={cliente.gastosReembolsaveis} />
+          </div>
+          {cliente.temSucumbencia && (
+            <div style={{ marginTop: 10 }}>
+              <SucumbenciaBox dono={cliente.dono} valorSucumbencial={cliente.valorSucumbencial} />
+            </div>
+          )}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 14 }}>
+            <button onClick={onEdit} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 12px", borderRadius: 8, border: `1.5px solid ${C.rule}`, backgroundColor: "#fff", color: C.ink, fontFamily: FONT_SANS, fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}><Icon name="pencil" size={13} /> Editar</button>
+            {!confirmingDelete ? (
+              <button onClick={onAskDelete} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 12px", borderRadius: 8, border: `1.5px solid ${C.redSoft}`, backgroundColor: "#fff", color: C.red, fontFamily: FONT_SANS, fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}><Icon name="trash" size={13} /> Excluir</button>
+            ) : (
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontFamily: FONT_SANS, fontSize: 12, color: C.red }}>Confirmar exclusão?</span>
+                <button onClick={onConfirmDelete} style={{ background: C.red, color: "#fff", border: "none", borderRadius: 6, padding: "5px 10px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>Sim</button>
+                <button onClick={onCancelDelete} style={{ background: "none", color: C.inkSoft, border: `1px solid ${C.rule}`, borderRadius: 6, padding: "5px 10px", fontSize: 12, cursor: "pointer" }}>Não</button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------- Auto rateio preview ----------
+function AutoRateioPreview({ split }) {
+  return (
+    <div style={{ backgroundColor: C.parchmentDark, borderRadius: 9, padding: "12px 14px" }}>
+      <div style={gridTwo}>
+        <LedgerValue label="Escritório" value={split.escritorio} />
+        <LedgerValue label="Cliente" value={split.cliente} />
+        <LedgerValue label="Dr. Flávio" value={split.flavio} />
+        <LedgerValue label="Dr. Bruno" value={split.bruno} />
+      </div>
+      {split.administrativoAplicado > 0 && (
+        <div style={{ fontFamily: FONT_SANS, fontSize: 11, color: C.inkSoft, marginTop: 8 }}>
+          Inclui {formatBRL(split.administrativoAplicado)} de valor administrativo, descontado do cliente.
+        </div>
+      )}
+      {split.gastosAplicado > 0 && (
+        <div style={{ fontFamily: FONT_SANS, fontSize: 11, color: C.inkSoft, marginTop: 4 }}>
+          Inclui {formatBRL(split.gastosAplicado)} de gastos reembolsáveis, descontados do cliente.
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------- Novo / Editar Levantamento Tab ----------
+function FormTab({ form, setForm, onSubmit, editingId, onCancelEdit, photoDataUrl, setPhotoDataUrl, photoBusy, fileInputRef, valorInputRef, onPhotoFile, responsaveisConhecidos, clientes, saving, showToast, rateioManual, setRateioManual, lastSaved, onNextEntry, onGeneratePDF, pdfBusy }) {
+  const [showDetails, setShowDetails] = useState(false);
+  function set(field, value) { setForm((f) => ({ ...f, [field]: value })); }
+  const linkedClient = clientes.find((c) => c.id === form.clienteId) || null;
+  const autoSplit = linkedClient && !rateioManual ? computeSplit({ valorTotal: parseNum(form.valorTotal), percentualExito: linkedClient.percentualExito, dono: linkedClient.dono, sucumbencial: form.sucumbencial, valorAdministrativo: linkedClient.valorAdministrativo, valorGastos: linkedClient.gastosReembolsaveis }) : null;
+  const somaManual = parseNum(form.valorEscritorio) + parseNum(form.valorCliente) + parseNum(form.valorFlavio) + parseNum(form.valorBruno);
+  const diffManual = Math.round((parseNum(form.valorTotal) - somaManual) * 100) / 100;
+  const showDiffWarning = !autoSplit && form.valorTotal && Math.abs(diffManual) > 0.01;
+
+  if (lastSaved) {
+    return (
+      <div>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", padding: "24px 16px", ...cardStyle }}>
+          <div style={{ width: 52, height: 52, borderRadius: 999, backgroundColor: C.greenSoft, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 12 }}>
+            <Icon name="check" size={26} color={C.green} strokeWidth={2.5} />
+          </div>
+          <span style={{ fontFamily: FONT_SERIF, fontSize: 18, fontWeight: 700, color: C.ink }}>Levantamento registrado</span>
+          <span style={{ fontFamily: FONT_SANS, fontSize: 13, color: C.inkSoft, marginTop: 4 }}>Toque no botão abaixo para gerar o PDF do comprovante e enviar direto pelo WhatsApp, e-mail, ou salvar no aparelho.</span>
+          <div style={{ width: "100%", marginTop: 16, backgroundColor: C.parchmentDark, borderRadius: 10, padding: 14, textAlign: "left" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+              <span style={{ fontFamily: FONT_SERIF, fontSize: 15, fontWeight: 700, color: C.ink }}>{lastSaved.cliente}</span>
+              <BankBadge banco={lastSaved.banco} />
+            </div>
+            <div style={{ fontFamily: FONT_MONO, fontSize: 11.5, color: C.inkSoft }}>Proc. {lastSaved.processo}</div>
+            <div style={{ fontFamily: FONT_MONO, fontSize: 20, fontWeight: 700, color: C.ink, marginTop: 6 }}>{formatBRL(lastSaved.valorTotal)}</div>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, width: "100%", marginTop: 16 }}>
+            <button onClick={() => onGeneratePDF(lastSaved)} disabled={pdfBusy} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: C.ink, color: "#fff", fontFamily: FONT_SANS, fontSize: 14.5, fontWeight: 700, padding: 13, borderRadius: 10, border: "none", cursor: pdfBusy ? "default" : "pointer", opacity: pdfBusy ? 0.7 : 1 }}>
+              {pdfBusy ? <Spinner size={16} /> : <Icon name="printer" size={16} />} {pdfBusy ? "Gerando PDF..." : "Compartilhar / baixar PDF"}
+            </button>
+            <button onClick={onNextEntry} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: "#fff", color: C.ink, fontFamily: FONT_SANS, fontSize: 14.5, fontWeight: 700, padding: 13, borderRadius: 10, border: `1.5px solid ${C.rule}`, cursor: "pointer" }}>
+              <Icon name="arrowRight" size={16} /> Registrar próximo cliente
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={onSubmit}>
+      {editingId && (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, padding: "8px 12px", borderRadius: 8, backgroundColor: C.brassSoft, border: `1px solid ${C.brass}` }}>
+          <span style={{ fontFamily: FONT_SANS, fontSize: 12.5, color: C.brassDark, fontWeight: 600 }}>Editando registro existente</span>
+          <button type="button" onClick={onCancelEdit} style={{ background: "none", border: "none", color: C.brassDark, cursor: "pointer" }}><Icon name="x" size={16} /></button>
+        </div>
+      )}
+
+      <div style={cardStyle}>
+        <span style={sectionLabelStyle}>Cliente</span>
+        {clientes.length > 0 ? (
+          <Field label="Selecione o cliente cadastrado" required>
+            <select value={form.clienteId} onChange={(e) => {
+                const id = e.target.value;
+                const c = clientes.find((cl) => cl.id === id);
+                setForm((f) => ({ ...f, clienteId: id, cliente: c ? c.nome : "", processo: c && c.processo ? c.processo : f.processo }));
+                setRateioManual(false);
+                if (id) setTimeout(() => valorInputRef.current && valorInputRef.current.focus(), 60);
+              }} style={{ ...inputBase, appearance: "none", fontSize: 16, fontWeight: 600 }}>
+              <option value="">— selecionar —</option>
+              {clientes.map((c) => (<option key={c.id} value={c.id}>{c.nome}{c.cpf ? ` — ${c.cpf}` : ""}</option>))}
+            </select>
+          </Field>
+        ) : (
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "10px 12px", borderRadius: 8, backgroundColor: C.parchmentDark, marginBottom: 12 }}>
+            <Icon name="info" size={13} color={C.inkSoft} />
+            <span style={{ fontFamily: FONT_SANS, fontSize: 12, color: C.inkSoft }}>Nenhum cliente cadastrado ainda. Cadastre na aba “Clientes” ou preencha manualmente abaixo.</span>
+          </div>
+        )}
+
+        {linkedClient ? (
+          <div style={{ marginTop: 4, padding: "10px 12px", borderRadius: 8, display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, backgroundColor: C.brassSoft, border: `1px solid ${C.brass}` }}>
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                <DonoBadge dono={linkedClient.dono} />
+                <span style={{ fontFamily: FONT_SANS, fontSize: 11.5, color: C.brassDark }}>Êxito {formatPct(linkedClient.percentualExito)}</span>
+              </div>
+              {linkedClient.numeroBeneficio && <div style={{ fontFamily: FONT_MONO, fontSize: 11, color: C.brassDark, marginTop: 3 }}>NB {linkedClient.numeroBeneficio}</div>}
+            </div>
+          </div>
+        ) : (
+          <React.Fragment>
+            <Field label="Cliente" required><TextInput value={form.cliente} onChange={(e) => set("cliente", e.target.value)} placeholder="Nome completo do cliente" /></Field>
+            <Field label="Número do processo" required><TextInput value={form.processo} onChange={(e) => set("processo", e.target.value)} placeholder="0000000-00.0000.0.00.0000" style={{ fontFamily: FONT_MONO, fontSize: 14 }} /></Field>
+          </React.Fragment>
+        )}
+      </div>
+
+      <div style={cardStyle}>
+        <span style={sectionLabelStyle}>Banco</span>
+        <div style={{ display: "flex", gap: 8 }}>
+          {Object.entries(BANCOS).map(([key, b]) => (
+            <button type="button" key={key} onClick={() => set("banco", key)} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "12px 0", borderRadius: 8, border: `1.5px solid ${form.banco === key ? b.color : C.rule}`, backgroundColor: form.banco === key ? b.color : "#fff", color: form.banco === key ? "#fff" : C.ink, fontFamily: FONT_SANS, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+              {b.short}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div style={cardStyle}>
+        <span style={sectionLabelStyle}>Valor levantado</span>
+        <MoneyInput big inputRef={valorInputRef} value={form.valorTotal} onChange={(e) => set("valorTotal", e.target.value)} />
+        <div style={{ marginTop: 12 }}>
+          <Field label="Responsável pelo levantamento" required>
+            <TextInput list="responsaveis-list" value={form.responsavel} onChange={(e) => set("responsavel", e.target.value)} placeholder="Quem foi ao banco" />
+            <datalist id="responsaveis-list">{responsaveisConhecidos.map((r) => (<option key={r} value={r} />))}</datalist>
+          </Field>
+        </div>
+        {linkedClient && (
+          <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+            <input type="checkbox" checked={form.sucumbencial} onChange={(e) => set("sucumbencial", e.target.checked)} style={{ width: 16, height: 16, accentColor: C.brass }} />
+            <span style={{ fontFamily: FONT_SANS, fontSize: 12.5, color: C.ink }}>Honorários sucumbenciais (100% {linkedClient.dono === "Flávio" ? "Dr. Flávio" : "Dr. Bruno"})</span>
+          </label>
+        )}
+      </div>
+
+      <div style={cardStyle}>
+        <span style={sectionLabelStyle}>Comprovante do banco</span>
+        <input type="file" accept="image/*,application/pdf" capture="environment" ref={fileInputRef} onChange={onPhotoFile} style={{ display: "none" }} />
+        {photoDataUrl ? (
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+            {isPdfDataUrl(photoDataUrl) ? (
+              <div style={{ width: 92, height: 92, borderRadius: 8, border: `1px solid ${C.rule}`, transform: "rotate(-1.5deg)", boxShadow: "0 2px 6px rgba(31,44,61,0.15)", flexShrink: 0, backgroundColor: C.parchmentDark, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4 }}>
+                <Icon name="clipboard" size={24} color={C.brassDark} />
+                <span style={{ fontFamily: FONT_SANS, fontSize: 10, fontWeight: 700, color: C.brassDark }}>PDF</span>
+              </div>
+            ) : (
+              <div style={{ width: 92, height: 92, borderRadius: 8, overflow: "hidden", border: `1px solid ${C.rule}`, transform: "rotate(-1.5deg)", boxShadow: "0 2px 6px rgba(31,44,61,0.15)", flexShrink: 0 }}>
+                <img src={photoDataUrl} alt="Comprovante" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              </div>
+            )}
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <button type="button" onClick={() => fileInputRef.current && fileInputRef.current.click()} style={{ fontFamily: FONT_SANS, fontSize: 12.5, fontWeight: 600, color: C.brassDark, background: "none", border: `1.5px solid ${C.brass}`, borderRadius: 7, padding: "6px 10px", cursor: "pointer" }}>Trocar arquivo</button>
+              <button type="button" onClick={() => setPhotoDataUrl(null)} style={{ fontFamily: FONT_SANS, fontSize: 12.5, color: C.red, background: "none", border: "none", padding: "0 2px", cursor: "pointer", textAlign: "left" }}>Remover</button>
+            </div>
+          </div>
+        ) : (
+          <button type="button" onClick={() => fileInputRef.current && fileInputRef.current.click()} disabled={photoBusy} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: 18, borderRadius: 10, border: `2px dashed ${C.brass}`, backgroundColor: C.brassSoft, color: C.brassDark, fontFamily: FONT_SANS, fontSize: 14.5, fontWeight: 700, cursor: "pointer" }}>
+            {photoBusy ? <Spinner size={18} color={C.brassDark} /> : <Icon name="camera" size={18} />}
+            {photoBusy ? "Processando..." : "Tirar foto ou anexar PDF do comprovante"}
+          </button>
+        )}
+      </div>
+
+      <div style={cardStyle}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+          <span style={{ ...sectionLabelStyle, marginBottom: 0 }}>Rateio dos valores</span>
+          {linkedClient && (
+            <button type="button" onClick={() => setRateioManual((m) => !m)} style={{ fontFamily: FONT_SANS, fontSize: 11.5, fontWeight: 700, color: C.brassDark, background: "none", border: "none", cursor: "pointer", textDecoration: "underline" }}>
+              {rateioManual ? "Usar cálculo automático" : "Ajustar manualmente"}
+            </button>
+          )}
+        </div>
+        {autoSplit ? (
+          form.valorTotal ? <AutoRateioPreview split={autoSplit} /> : <span style={{ fontFamily: FONT_SANS, fontSize: 12.5, color: C.inkSoft }}>Informe o valor levantado para calcular o rateio.</span>
+        ) : (
+          <React.Fragment>
+            <div style={gridTwo}>
+              <Field label="Escritório"><MoneyInput value={form.valorEscritorio} onChange={(e) => set("valorEscritorio", e.target.value)} /></Field>
+              <Field label="Cliente"><MoneyInput value={form.valorCliente} onChange={(e) => set("valorCliente", e.target.value)} /></Field>
+              <Field label="Dr. Flávio"><MoneyInput value={form.valorFlavio} onChange={(e) => set("valorFlavio", e.target.value)} /></Field>
+              <Field label="Dr. Bruno (honorários)"><MoneyInput value={form.valorBruno} onChange={(e) => set("valorBruno", e.target.value)} /></Field>
+            </div>
+            {form.valorTotal && (
+              <div style={{ marginTop: 4, padding: "8px 12px", borderRadius: 8, display: "flex", alignItems: "flex-start", gap: 8, backgroundColor: showDiffWarning ? C.redSoft : C.greenSoft, border: `1px solid ${showDiffWarning ? C.red : C.green}` }}>
+                <Icon name={showDiffWarning ? "alert" : "check"} size={15} color={showDiffWarning ? C.red : C.green} />
+                <span style={{ fontFamily: FONT_SANS, fontSize: 12.5, color: showDiffWarning ? C.red : C.green }}>
+                  {showDiffWarning ? `Rateio (${formatBRL(somaManual)}) não bate com o valor total. Diferença de ${formatBRL(Math.abs(diffManual))} ${diffManual > 0 ? "faltando distribuir" : "a mais no rateio"}.` : `Rateio confere com o valor total (${formatBRL(somaManual)}).`}
+                </span>
+              </div>
+            )}
+          </React.Fragment>
+        )}
+      </div>
+
+      <button type="button" onClick={() => setShowDetails((s) => !s)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 4px", marginBottom: 8, background: "none", border: "none", cursor: "pointer" }}>
+        <span style={{ fontFamily: FONT_SANS, fontSize: 12.5, fontWeight: 700, color: C.inkSoft, textTransform: "uppercase", letterSpacing: "0.05em" }}>Mais detalhes</span>
+        <Icon name={showDetails ? "chevronUp" : "chevronDown"} size={16} color={C.inkSoft} />
+      </button>
+
+      {showDetails && (
+        <div style={cardStyle}>
+          <Field label="Data do levantamento" required><TextInput type="date" value={form.dataLevantamento} onChange={(e) => set("dataLevantamento", e.target.value)} /></Field>
+          <span style={sectionLabelStyle}>Observações</span>
+          <textarea value={form.obs} onChange={(e) => set("obs", e.target.value)} placeholder="Opcional" rows={2} style={{ ...inputBase, resize: "vertical", fontFamily: FONT_SANS }} />
+        </div>
+      )}
+
+      <button type="submit" disabled={saving} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: C.ink, color: "#fff", fontFamily: FONT_SANS, fontSize: 15, fontWeight: 700, padding: 14, borderRadius: 10, border: "none", cursor: saving ? "default" : "pointer", opacity: saving ? 0.7 : 1 }}>
+        {saving ? <Spinner size={17} /> : <Icon name="check" size={17} />}
+        {editingId ? "Salvar alterações" : "Registrar levantamento"}
+      </button>
+    </form>
+  );
+}
+
+// ---------- Histórico Tab ----------
+function HistoricoTab({ entries, pendentesCount, totalPendente, onEdit, onDelete, onGeneratePDF, pdfBusy }) {
+  const [expandedId, setExpandedId] = useState(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  if (entries.length === 0) return <EmptyState title="Nenhum levantamento registrado" text="Toque em “Novo” para registrar o primeiro levantamento de RPV." />;
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, padding: "10px 14px", borderRadius: 8, backgroundColor: C.card, border: `1px solid ${C.ruleSoft}` }}>
+        <span style={{ fontFamily: FONT_SANS, fontSize: 12.5, color: C.inkSoft }}>{entries.length} registro(s) · {pendentesCount} pendente(s)</span>
+        <span style={{ fontFamily: FONT_MONO, fontSize: 13, fontWeight: 700, color: C.brassDark }}>{formatBRL(totalPendente)}</span>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        {entries.map((en, i) => (
+          <EntryCard key={en.id} entry={en} index={entries.length - i} expanded={expandedId === en.id} onToggle={() => setExpandedId(expandedId === en.id ? null : en.id)}
+            onEdit={() => onEdit(en)} onGeneratePDF={() => onGeneratePDF(en)} pdfBusy={pdfBusy} confirmingDelete={confirmDeleteId === en.id}
+            onAskDelete={() => setConfirmDeleteId(en.id)} onCancelDelete={() => setConfirmDeleteId(null)}
+            onConfirmDelete={() => { onDelete(en.id); setConfirmDeleteId(null); }} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function EntryCard({ entry, index, expanded, onToggle, onEdit, onGeneratePDF, pdfBusy, confirmingDelete, onAskDelete, onCancelDelete, onConfirmDelete }) {
+  return (
+    <div style={{ backgroundColor: C.card, border: `1px solid ${C.ruleSoft}`, borderLeft: `4px solid ${C.brass}`, borderRadius: 10, overflow: "hidden" }}>
+      <button onClick={onToggle} style={{ width: "100%", textAlign: "left", padding: "12px 14px", display: "flex", alignItems: "flex-start", gap: 12, background: "none", border: "none", cursor: "pointer" }}>
+        <span style={{ fontFamily: FONT_SERIF, fontSize: 12, color: C.rule, fontWeight: 700, marginTop: 2 }}>{String(index).padStart(2, "0")}</span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <span style={{ fontFamily: FONT_SERIF, fontSize: 15, fontWeight: 700, color: C.ink }}>{entry.cliente}</span>
+            <BankBadge banco={entry.banco} />
+            {entry.sucumbencial && <span style={{ fontFamily: FONT_SANS, fontSize: 10, fontWeight: 700, color: C.blue, backgroundColor: C.blueSoft, padding: "2px 6px", borderRadius: 4, textTransform: "uppercase", letterSpacing: "0.03em" }}>Sucumbência</span>}
+          </div>
+          <div style={{ fontFamily: FONT_MONO, fontSize: 11.5, color: C.inkSoft, marginTop: 2 }}>Proc. {entry.processo}</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
+            <span style={{ fontFamily: FONT_SANS, fontSize: 11.5, color: C.inkSoft }}>{formatDateBR(entry.dataLevantamento)}</span>
+            <StatusStamp enviado={entry.enviado} />
+          </div>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+          <span style={{ fontFamily: FONT_MONO, fontSize: 15, fontWeight: 700, color: C.ink, fontVariantNumeric: "tabular-nums" }}>{formatBRL(entry.valorTotal)}</span>
+          <Icon name={expanded ? "chevronUp" : "chevronDown"} size={16} color={C.inkSoft} />
+        </div>
+      </button>
+      {expanded && (
+        <div style={{ padding: "0 14px 14px", borderTop: `1px dashed ${C.ruleSoft}` }}>
+          <div style={{ ...gridTwo, marginTop: 12 }}>
+            <LedgerValue label="Escritório" value={entry.valorEscritorio} />
+            <LedgerValue label="Cliente" value={entry.valorCliente} />
+            <LedgerValue label="Dr. Flávio" value={entry.valorFlavio} />
+            <LedgerValue label="Dr. Bruno" value={entry.valorBruno} />
+          </div>
+          <div style={{ marginTop: 10, fontFamily: FONT_SANS, fontSize: 12.5, color: C.inkSoft }}>Responsável pelo levantamento: <strong style={{ color: C.ink }}>{entry.responsavel}</strong></div>
+          {entry.obs && <div style={{ marginTop: 4, fontFamily: FONT_SANS, fontSize: 12.5, color: C.inkSoft, fontStyle: "italic" }}>“{entry.obs}”</div>}
+          {entry.foto && (
+            <div style={{ marginTop: 12 }}>
+              {isPdfDataUrl(entry.foto) ? (
+                <a href={entry.foto} download={`comprovante-${entry.cliente}.pdf`} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 12px", borderRadius: 8, border: `1px solid ${C.rule}`, backgroundColor: "#fff", color: C.ink, fontFamily: FONT_SANS, fontSize: 12.5, fontWeight: 600, textDecoration: "none" }}>
+                  <Icon name="clipboard" size={14} /> Ver comprovante (PDF)
+                </a>
+              ) : (
+                <img src={entry.foto} alt="Comprovante" style={{ maxWidth: 160, borderRadius: 8, border: `1px solid ${C.rule}`, transform: "rotate(-1deg)", boxShadow: "0 2px 6px rgba(31,44,61,0.15)" }} />
+              )}
+            </div>
+          )}
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
+            <button onClick={onGeneratePDF} disabled={pdfBusy} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 12px", borderRadius: 8, border: `1.5px solid ${C.brass}`, backgroundColor: C.brassSoft, color: C.brassDark, fontFamily: FONT_SANS, fontSize: 12.5, fontWeight: 700, cursor: pdfBusy ? "default" : "pointer", opacity: pdfBusy ? 0.6 : 1 }}>
+              {pdfBusy ? <Spinner size={13} color={C.brassDark} /> : <Icon name="printer" size={13} />} PDF
+            </button>
+            <button onClick={onEdit} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 12px", borderRadius: 8, border: `1.5px solid ${C.rule}`, backgroundColor: "#fff", color: C.ink, fontFamily: FONT_SANS, fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}><Icon name="pencil" size={13} /> Editar</button>
+            {!confirmingDelete ? (
+              <button onClick={onAskDelete} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 12px", borderRadius: 8, border: `1.5px solid ${C.redSoft}`, backgroundColor: "#fff", color: C.red, fontFamily: FONT_SANS, fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}><Icon name="trash" size={13} /> Excluir</button>
+            ) : (
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ fontFamily: FONT_SANS, fontSize: 12, color: C.red }}>Confirmar exclusão?</span>
+                <button onClick={onConfirmDelete} style={{ background: C.red, color: "#fff", border: "none", borderRadius: 6, padding: "5px 10px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>Sim</button>
+                <button onClick={onCancelDelete} style={{ background: "none", color: C.inkSoft, border: `1px solid ${C.rule}`, borderRadius: 6, padding: "5px 10px", fontSize: 12, cursor: "pointer" }}>Não</button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function LedgerValue({ label, value }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: `1px dotted ${C.ruleSoft}`, paddingBottom: 3 }}>
+      <span style={{ fontFamily: FONT_SANS, fontSize: 11.5, color: C.inkSoft }}>{label}</span>
+      <span style={{ fontFamily: FONT_MONO, fontSize: 12.5, color: C.ink, fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{formatBRL(value)}</span>
+    </div>
+  );
+}
+
+// ---------- Relatório Tab ----------
+function RelatorioTab({ entries, onMarkSent, showToast, onGeneratePDF, pdfBusy }) {
+  const [dataInicio, setDataInicio] = useState("");
+  const [dataFim, setDataFim] = useState("");
+  const [apenasPendentes, setApenasPendentes] = useState(true);
+  const [selecionados, setSelecionados] = useState(() => new Set());
+  const [showPreview, setShowPreview] = useState(false);
+
+  const filtrados = useMemo(() => {
+    return entries.filter((en) => (apenasPendentes ? !en.enviado : true))
+      .filter((en) => (dataInicio ? en.dataLevantamento >= dataInicio : true))
+      .filter((en) => (dataFim ? en.dataLevantamento <= dataFim : true))
+      .sort((a, b) => (a.dataLevantamento || "").localeCompare(b.dataLevantamento || ""));
+  }, [entries, apenasPendentes, dataInicio, dataFim]);
+
+  useEffect(() => { setSelecionados(new Set(filtrados.map((en) => en.id))); }, [dataInicio, dataFim, apenasPendentes, entries.length]);
+
+  const lista = filtrados.filter((en) => selecionados.has(en.id));
+  const totals = lista.reduce((acc, en) => {
+    acc.total += en.valorTotal || 0; acc.escritorio += en.valorEscritorio || 0; acc.cliente += en.valorCliente || 0;
+    acc.flavio += en.valorFlavio || 0; acc.bruno += en.valorBruno || 0; return acc;
+  }, { total: 0, escritorio: 0, cliente: 0, flavio: 0, bruno: 0 });
+
+  const periodoLabel = dataInicio || dataFim ? `${dataInicio ? formatDateBR(dataInicio) : "início"} a ${dataFim ? formatDateBR(dataFim) : "hoje"}` : "todos os registros";
+
+  function reportText() {
+    const linhas = lista.map((en, i) => (
+      `${i + 1}. ${en.cliente} — Proc. ${en.processo}${en.sucumbencial ? " (honorários sucumbenciais)" : ""}\n` +
+      `   Banco: ${BANCOS[en.banco] ? BANCOS[en.banco].short : en.banco} | Data: ${formatDateBR(en.dataLevantamento)} | Responsável: ${en.responsavel}\n` +
+      `   Valor total: ${formatBRL(en.valorTotal)}\n` +
+      `   Escritório: ${formatBRL(en.valorEscritorio)} | Cliente: ${formatBRL(en.valorCliente)} | Dr. Flávio: ${formatBRL(en.valorFlavio)} | Dr. Bruno (honorários): ${formatBRL(en.valorBruno)}` +
+      (en.obs ? `\n   Obs: ${en.obs}` : "")
+    )).join("\n\n");
+    return (
+      `RELATÓRIO DE LEVANTAMENTO DE RPV — REZENDE MAIA ADVOCACIA\n` +
+      `Gerado em ${formatDateBR(todayISO())} · Período: ${periodoLabel}\n` +
+      `${lista.length} levantamento(s)\n\n${linhas || "(nenhum registro selecionado)"}\n\n————————————————————\nTOTAIS\n` +
+      `Valor total levantado: ${formatBRL(totals.total)}\nEscritório: ${formatBRL(totals.escritorio)}\nCliente: ${formatBRL(totals.cliente)}\n` +
+      `Dr. Flávio: ${formatBRL(totals.flavio)}\nDr. Bruno (honorários): ${formatBRL(totals.bruno)}`
+    );
+  }
+
+  async function copyReport() {
+    const text = reportText();
+    try { await navigator.clipboard.writeText(text); showToast("Relatório copiado. Cole no WhatsApp ou e-mail para o financeiro e Dr. Flávio."); }
+    catch (e) { showToast("Não copiou automaticamente — selecione o texto do relatório manualmente.", "error"); setShowPreview(true); }
+  }
+  function toggleSelect(id) { setSelecionados((prev) => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; }); }
+
+  return (
+    <div>
+      <div style={cardStyle}>
+        <span style={sectionLabelStyle}>Filtros</span>
+        <div style={gridTwo}>
+          <Field label="De"><TextInput type="date" value={dataInicio} onChange={(e) => setDataInicio(e.target.value)} /></Field>
+          <Field label="Até"><TextInput type="date" value={dataFim} onChange={(e) => setDataFim(e.target.value)} /></Field>
+        </div>
+        <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+          <input type="checkbox" checked={apenasPendentes} onChange={(e) => setApenasPendentes(e.target.checked)} style={{ width: 16, height: 16, accentColor: C.brass }} />
+          <span style={{ fontFamily: FONT_SANS, fontSize: 13, color: C.ink }}>Somente pendentes de envio</span>
+        </label>
+      </div>
+
+      {filtrados.length === 0 ? (
+        <EmptyState title="Nada por aqui" text="Nenhum levantamento encontrado para os filtros selecionados." />
+      ) : (
+        <React.Fragment>
+          <div style={cardStyle}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+              <span style={{ ...sectionLabelStyle, marginBottom: 0 }}>Registros incluídos</span>
+              <span style={{ fontFamily: FONT_SANS, fontSize: 12, color: C.inkSoft }}>{selecionados.size}/{filtrados.length}</span>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {filtrados.map((en) => (
+                <label key={en.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: 8, cursor: "pointer", backgroundColor: selecionados.has(en.id) ? C.brassSoft : C.parchmentDark }}>
+                  <input type="checkbox" checked={selecionados.has(en.id)} onChange={() => toggleSelect(en.id)} style={{ width: 15, height: 15, accentColor: C.brass, flexShrink: 0 }} />
+                  <span style={{ fontFamily: FONT_SANS, fontSize: 12.5, color: C.ink, flex: 1, minWidth: 0 }}>{en.cliente} <span style={{ color: C.inkSoft }}>· {formatDateBR(en.dataLevantamento)}</span></span>
+                  <span style={{ fontFamily: FONT_MONO, fontSize: 12.5, fontWeight: 700, color: C.ink }}>{formatBRL(en.valorTotal)}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ ...cardStyle, backgroundColor: C.ink }}>
+            <span style={{ fontFamily: FONT_SERIF, fontSize: 12, fontWeight: 700, color: C.brassSoft, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10, display: "block" }}>Totais do relatório</span>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <TotalRow label="Valor total levantado" value={totals.total} strong />
+              <TotalRow label="Escritório" value={totals.escritorio} />
+              <TotalRow label="Cliente" value={totals.cliente} />
+              <TotalRow label="Dr. Flávio" value={totals.flavio} />
+              <TotalRow label="Dr. Bruno (honorários)" value={totals.bruno} />
+            </div>
+          </div>
+
+          <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
+            <button onClick={copyReport} disabled={lista.length === 0} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: C.ink, color: "#fff", fontFamily: FONT_SANS, fontSize: 13.5, fontWeight: 700, padding: 13, borderRadius: 10, border: "none", cursor: lista.length === 0 ? "default" : "pointer", opacity: lista.length === 0 ? 0.5 : 1 }}>
+              <Icon name="copy" size={15} /> Copiar texto
+            </button>
+            <button onClick={() => onGeneratePDF(lista, totals, periodoLabel)} disabled={lista.length === 0 || pdfBusy} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: "#fff", color: C.ink, fontFamily: FONT_SANS, fontSize: 13.5, fontWeight: 700, padding: 13, borderRadius: 10, border: `1.5px solid ${C.rule}`, cursor: (lista.length === 0 || pdfBusy) ? "default" : "pointer", opacity: (lista.length === 0 || pdfBusy) ? 0.5 : 1 }}>
+              {pdfBusy ? <Spinner size={15} color={C.ink} /> : <Icon name="printer" size={15} />} {pdfBusy ? "Gerando..." : "Baixar PDF"}
+            </button>
+          </div>
+
+          <button onClick={() => setShowPreview((s) => !s)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 4, marginBottom: 12, fontFamily: FONT_SANS, fontSize: 12, color: C.inkSoft, background: "none", border: "none", cursor: "pointer" }}>
+            {showPreview ? "Ocultar" : "Ver"} texto do relatório <Icon name={showPreview ? "chevronUp" : "chevronDown"} size={14} />
+          </button>
+
+          {lista.length > 0 && !lista.every((en) => en.enviado) && (
+            <button onClick={() => onMarkSent(lista.map((en) => en.id))} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 16, backgroundColor: C.greenSoft, border: `1.5px solid ${C.green}`, color: C.green, fontFamily: FONT_SANS, fontSize: 13.5, fontWeight: 700, padding: 12, borderRadius: 10, cursor: "pointer" }}>
+              <Icon name="check" size={15} /> Marcar selecionados como enviados
+            </button>
+          )}
+
+          {showPreview && (
+            <div style={{ backgroundColor: "#fff", border: `1px solid ${C.ruleSoft}`, borderRadius: 10, padding: 14, marginBottom: 20 }}>
+              <pre style={{ fontFamily: FONT_MONO, fontSize: 11.5, color: C.ink, whiteSpace: "pre-wrap", wordBreak: "break-word", margin: 0, lineHeight: 1.5 }}>{reportText()}</pre>
+            </div>
+          )}
+        </React.Fragment>
+      )}
+    </div>
+  );
+}
+function TotalRow({ label, value, strong }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <span style={{ fontFamily: FONT_SANS, fontSize: strong ? 13.5 : 12.5, color: strong ? "#fff" : "#B7C2CE" }}>{label}</span>
+      <span style={{ fontFamily: FONT_MONO, fontSize: strong ? 16 : 13, fontWeight: 700, color: strong ? C.brassSoft : "#E4E9EE", fontVariantNumeric: "tabular-nums" }}>{formatBRL(value)}</span>
+    </div>
+  );
+}
+
+// ---------- PDF generation (real PDF file — works identically on iPhone, iPad and computer) ----------
+const PDF_INK = [31, 44, 61];
+const PDF_BRASS = [124, 97, 31];
+const PDF_SOFT = [90, 107, 125];
+const PDF_BRASS_BG = [241, 230, 200];
+
+function pdfHeader(doc, subtitle) {
+  doc.setFont("times", "bold");
+  doc.setFontSize(10);
+  doc.setTextColor(...PDF_BRASS);
+  doc.text("REZENDE MAIA ADVOCACIA", 40, 46);
+  doc.setFontSize(17);
+  doc.setTextColor(...PDF_INK);
+  doc.text(subtitle, 40, 66);
+  doc.setDrawColor(...PDF_INK);
+  doc.setLineWidth(1);
+  doc.line(40, 76, 555, 76);
+  return 100;
+}
+function pdfFooter(doc) {
+  const pageCount = doc.internal.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(138, 147, 160);
+    doc.text(`Documento interno gerado pelo Controle de RPV — Rezende Maia Advocacia em ${nowLabel()}.`, 40, 810);
+  }
+}
+function pdfInfoTable(doc, y, rows) {
+  doc.autoTable({
+    startY: y,
+    body: rows,
+    theme: "plain",
+    styles: { font: "helvetica", fontSize: 10, cellPadding: 3, textColor: PDF_INK },
+    columnStyles: { 0: { fontStyle: "bold", textColor: PDF_SOFT, cellWidth: 140 } },
+    margin: { left: 40, right: 40 },
+  });
+  return doc.lastAutoTable.finalY + 14;
+}
+
+function buildSinglePdfBlob(entry, cliente, photo) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: "pt", format: "a4" });
+  let y = pdfHeader(doc, "Comprovante de Levantamento de RPV");
+
+  const clientRows = [["Cliente", entry.cliente]];
+  if (cliente && cliente.cpf) clientRows.push(["CPF", cliente.cpf]);
+  if (cliente && cliente.numeroBeneficio) clientRows.push(["Nº do benefício", cliente.numeroBeneficio]);
+  clientRows.push(["Nº do processo", entry.processo]);
+  clientRows.push(["Dono do cliente", entry.donoCliente === "Flávio" ? "Dr. Flávio" : "Dr. Bruno"]);
+  y = pdfInfoTable(doc, y, clientRows);
+
+  const levRows = [
+    ["Banco", BANCOS[entry.banco] ? BANCOS[entry.banco].label : entry.banco],
+    ["Data do levantamento", formatDateBR(entry.dataLevantamento)],
+    ["Responsável", entry.responsavel],
+    ["Valor total levantado", formatBRL(entry.valorTotal)],
+  ];
+  if (entry.sucumbencial) levRows.push(["Natureza", "Honorários sucumbenciais (100% do dono do cliente)"]);
+  y = pdfInfoTable(doc, y, levRows);
+
+  doc.setFont("times", "bold");
+  doc.setFontSize(11);
+  doc.setTextColor(...PDF_BRASS);
+  doc.text("RATEIO", 40, y);
+  y += 6;
+  doc.autoTable({
+    startY: y,
+    head: [["Destinatário", "Valor"]],
+    body: [
+      ["Escritório", formatBRL(entry.valorEscritorio)],
+      ["Cliente", formatBRL(entry.valorCliente)],
+      ["Dr. Flávio", formatBRL(entry.valorFlavio)],
+      ["Dr. Bruno (honorários)", formatBRL(entry.valorBruno)],
+    ],
+    styles: { font: "helvetica", fontSize: 10, cellPadding: 6, textColor: PDF_INK },
+    headStyles: { fillColor: PDF_BRASS_BG, textColor: PDF_BRASS, fontStyle: "bold" },
+    columnStyles: { 1: { halign: "right" } },
+    margin: { left: 40, right: 40 },
+  });
+  y = doc.lastAutoTable.finalY + 18;
+
+  if (entry.obs) {
+    doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.setTextColor(...PDF_SOFT);
+    doc.text("OBSERVAÇÕES", 40, y); y += 14;
+    doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.setTextColor(...PDF_INK);
+    const lines = doc.splitTextToSize(entry.obs, 500);
+    doc.text(lines, 40, y); y += lines.length * 13 + 10;
+  }
+
+  if (photo && !isPdfDataUrl(photo)) {
+    try {
+      if (y > 620) { doc.addPage(); y = 60; }
+      const props = doc.getImageProperties(photo);
+      const w = 240;
+      const h = (props.height / props.width) * w;
+      doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.setTextColor(...PDF_SOFT);
+      doc.text("COMPROVANTE EMITIDO PELO BANCO", 40, y); y += 12;
+      doc.addImage(photo, "JPEG", 40, y, w, h);
+    } catch (e) { /* imagem inválida — ignora silenciosamente */ }
+  } else if (photo && isPdfDataUrl(photo)) {
+    doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.setTextColor(...PDF_SOFT);
+    doc.text("COMPROVANTE EMITIDO PELO BANCO", 40, y); y += 14;
+    doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.setTextColor(...PDF_INK);
+    doc.text("Anexado em arquivo PDF separado.", 40, y);
+  }
+
+  pdfFooter(doc);
+  return doc.output("blob");
+}
+
+function buildBatchPdfBlob(list, totals, periodoLabel) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: "pt", format: "a4", orientation: "landscape" });
+  let y = pdfHeader(doc, "Relatório de Levantamento de RPV");
+
+  doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.setTextColor(...PDF_SOFT);
+  doc.text(`Gerado em ${formatDateBR(todayISO())} · Período: ${periodoLabel} · ${list.length} levantamento(s)`, 40, y);
+  y += 16;
+
+  doc.autoTable({
+    startY: y,
+    head: [["Cliente", "Processo", "Banco", "Data", "Responsável", "Total", "Escritório", "Cliente", "Dr. Flávio", "Dr. Bruno"]],
+    body: list.map((en) => [
+      en.cliente,
+      en.processo,
+      BANCOS[en.banco] ? BANCOS[en.banco].short : en.banco,
+      formatDateBR(en.dataLevantamento),
+      en.responsavel,
+      formatBRL(en.valorTotal),
+      formatBRL(en.valorEscritorio),
+      formatBRL(en.valorCliente),
+      formatBRL(en.valorFlavio),
+      formatBRL(en.valorBruno),
+    ]),
+    styles: { font: "helvetica", fontSize: 8.5, cellPadding: 5, textColor: PDF_INK },
+    headStyles: { fillColor: PDF_BRASS_BG, textColor: PDF_BRASS, fontStyle: "bold" },
+    columnStyles: { 5: { halign: "right" }, 6: { halign: "right" }, 7: { halign: "right" }, 8: { halign: "right" }, 9: { halign: "right" } },
+    margin: { left: 40, right: 40 },
+  });
+  y = doc.lastAutoTable.finalY + 16;
+
+  doc.autoTable({
+    startY: y,
+    body: [
+      ["Valor total levantado", formatBRL(totals.total)],
+      ["Escritório", formatBRL(totals.escritorio)],
+      ["Cliente", formatBRL(totals.cliente)],
+      ["Dr. Flávio", formatBRL(totals.flavio)],
+      ["Dr. Bruno (honorários)", formatBRL(totals.bruno)],
+    ],
+    theme: "plain",
+    styles: { font: "helvetica", fontSize: 10, cellPadding: 3, textColor: PDF_INK },
+    columnStyles: { 0: { fontStyle: "bold", textColor: PDF_SOFT, cellWidth: 180 }, 1: { fontStyle: "bold" } },
+    margin: { left: 40 },
+    tableWidth: 260,
+  });
+
+  pdfFooter(doc);
+  return doc.output("blob");
+}
+
+async function shareFiles(items, showToast) {
+  // items: [{ blob, filename }, ...]
+  try {
+    const files = items.map((it) => new File([it.blob], it.filename, { type: "application/pdf" }));
+    if (navigator.canShare && navigator.canShare({ files })) {
+      await navigator.share({ files, title: items[0].filename });
+      return;
+    }
+  } catch (err) {
+    if (err && err.name === "AbortError") return; // usuário cancelou o compartilhamento
+    // se o compartilhamento falhar por outro motivo, cai no download abaixo
+  }
+  let anyFailed = false;
+  for (const it of items) {
+    try {
+      const url = URL.createObjectURL(it.blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = it.filename;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 30000);
+    } catch (err) {
+      anyFailed = true;
+    }
+  }
+  if (showToast) {
+    showToast(anyFailed ? "Não foi possível gerar o PDF neste navegador." : "Arquivo(s) baixado(s). Verifique a pasta de downloads ou o app Arquivos.", anyFailed ? "error" : "success");
+  }
+}
+async function sharePdfBlob(blob, filename, showToast) {
+  return shareFiles([{ blob, filename }], showToast);
+}
+
+// ---------- Main App ----------
+function RPVLedgerApp() {
+  const [user, setUser] = useState(undefined); // undefined = checking, null = logged out
+  const [entries, setEntries] = useState([]);
+  const [clientes, setClientes] = useState([]);
+  const [dataLoading, setDataLoading] = useState(true);
+  const [tab, setTab] = useState("clientes");
+  const [toast, setToast] = useState(null);
+
+  const [form, setForm] = useState(EMPTY_FORM);
+  const [editingId, setEditingId] = useState(null);
+  const [rateioManual, setRateioManual] = useState(false);
+  const [photoDataUrl, setPhotoDataUrl] = useState(null);
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [lastSaved, setLastSaved] = useState(null);
+  const fileInputRef = useRef(null);
+  const valorInputRef = useRef(null);
+
+  const [clientForm, setClientForm] = useState(EMPTY_CLIENT_FORM);
+  const [editingClienteId, setEditingClienteId] = useState(null);
+  const [savingCliente, setSavingCliente] = useState(false);
+  const [pdfBusy, setPdfBusy] = useState(false);
+
+  useEffect(() => {
+    const unsub = auth.onAuthStateChanged((u) => setUser(u || null));
+    return () => unsub();
+  }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    setDataLoading(true);
+    const unsubEntries = db.collection("levantamentos").orderBy("dataLevantamento", "desc").onSnapshot(
+      (snap) => { setEntries(snap.docs.map((d) => d.data())); setDataLoading(false); },
+      () => setDataLoading(false)
+    );
+    const unsubClientes = db.collection("clientes").orderBy("dataCadastro", "desc").onSnapshot(
+      (snap) => setClientes(snap.docs.map((d) => d.data())),
+      () => {}
+    );
+    return () => { unsubEntries(); unsubClientes(); };
+  }, [user]);
+
+  function showToast(msg, type) {
+    setToast({ msg, type: type || "success" });
+    window.clearTimeout(showToast._t);
+    showToast._t = window.setTimeout(() => setToast(null), 3200);
+  }
+
+  const responsaveisConhecidos = useMemo(() => Array.from(new Set(entries.map((e) => e.responsavel).filter(Boolean))), [entries]);
+
+  function resetForm() { setForm(EMPTY_FORM); setPhotoDataUrl(null); setEditingId(null); setRateioManual(false); setLastSaved(null); }
+  function nextEntry() { setForm((f) => ({ ...EMPTY_FORM, banco: f.banco, responsavel: f.responsavel })); setPhotoDataUrl(null); setEditingId(null); setRateioManual(false); setLastSaved(null); }
+
+  async function startEdit(entry) {
+    setEditingId(entry.id); setLastSaved(null); setRateioManual(true);
+    setForm({
+      clienteId: entry.clienteId || "", cliente: entry.cliente, processo: entry.processo, banco: entry.banco,
+      dataLevantamento: entry.dataLevantamento, responsavel: entry.responsavel,
+      valorTotal: entry.valorTotal ? String(entry.valorTotal) : "",
+      valorEscritorio: entry.valorEscritorio ? String(entry.valorEscritorio) : "",
+      valorCliente: entry.valorCliente ? String(entry.valorCliente) : "",
+      valorFlavio: entry.valorFlavio ? String(entry.valorFlavio) : "",
+      valorBruno: entry.valorBruno ? String(entry.valorBruno) : "",
+      sucumbencial: !!entry.sucumbencial, obs: entry.obs || "",
+    });
+    setPhotoDataUrl(entry.foto || null);
+    setTab("novo");
+  }
+
+  async function handlePhotoFile(e) {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = "";
+    if (!file) return;
+    setPhotoBusy(true);
+    try {
+      if (file.type === "application/pdf") {
+        if (file.size > MAX_PDF_BYTES) {
+          showToast(`PDF muito grande (máx. ${Math.round(MAX_PDF_BYTES / 1024)} KB). Tente um arquivo menor.`, "error");
+        } else {
+          setPhotoDataUrl(await readFileAsDataURL(file));
+        }
+      } else {
+        setPhotoDataUrl(await compressImage(file));
+      }
+    } catch (err) {
+      showToast("Não foi possível processar o arquivo.", "error");
+    }
+    setPhotoBusy(false);
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    if (!form.cliente.trim() || !form.processo.trim() || !form.dataLevantamento || !form.responsavel.trim() || !form.valorTotal) {
+      showToast("Preencha os campos obrigatórios.", "error"); return;
+    }
+    setSaving(true);
+    const id = editingId || newId("rpv");
+    const baseEntry = editingId ? entries.find((en) => en.id === editingId) : null;
+    const linkedClient = clientes.find((c) => c.id === form.clienteId) || null;
+
+    let valores;
+    if (linkedClient && !rateioManual) {
+      const split = computeSplit({ valorTotal: parseNum(form.valorTotal), percentualExito: linkedClient.percentualExito, dono: linkedClient.dono, sucumbencial: form.sucumbencial, valorAdministrativo: linkedClient.valorAdministrativo, valorGastos: linkedClient.gastosReembolsaveis });
+      valores = { valorEscritorio: split.escritorio, valorCliente: split.cliente, valorFlavio: split.flavio, valorBruno: split.bruno };
+    } else {
+      valores = { valorEscritorio: parseNum(form.valorEscritorio), valorCliente: parseNum(form.valorCliente), valorFlavio: parseNum(form.valorFlavio), valorBruno: parseNum(form.valorBruno) };
+    }
+
+    const entry = {
+      id, clienteId: form.clienteId || null, cliente: form.cliente.trim(), processo: form.processo.trim(),
+      banco: form.banco, dataLevantamento: form.dataLevantamento, responsavel: form.responsavel.trim(),
+      valorTotal: parseNum(form.valorTotal), ...valores, sucumbencial: !!form.sucumbencial,
+      donoCliente: linkedClient ? linkedClient.dono : baseEntry ? baseEntry.donoCliente : null,
+      obs: form.obs.trim(), foto: photoDataUrl || null, temFoto: !!photoDataUrl,
+      enviado: baseEntry ? !!baseEntry.enviado : false, enviadoEm: baseEntry ? baseEntry.enviadoEm : null,
+      criadoEm: baseEntry ? baseEntry.criadoEm : Date.now(), editadoEm: Date.now(),
+      registradoPor: user.email,
+    };
+
+    try {
+      await db.collection("levantamentos").doc(id).set(entry);
+    } catch (err) {
+      showToast("Erro ao salvar: " + err.message, "error");
+      setSaving(false);
+      return;
+    }
+
+    setSaving(false);
+    if (editingId) { showToast("Levantamento atualizado."); resetForm(); setTab("historico"); }
+    else { showToast("Levantamento registrado."); setLastSaved(entry); }
+  }
+
+  async function handleDelete(id) {
+    try { await db.collection("levantamentos").doc(id).delete(); showToast("Registro excluído."); if (editingId === id) resetForm(); }
+    catch (err) { showToast("Erro ao excluir: " + err.message, "error"); }
+  }
+
+  async function markAsSent(ids) {
+    try {
+      const batch = db.batch();
+      const stamp = Date.now();
+      ids.forEach((id) => batch.update(db.collection("levantamentos").doc(id), { enviado: true, enviadoEm: stamp }));
+      await batch.commit();
+      showToast(`${ids.length} registro(s) marcado(s) como enviado(s).`);
+    } catch (err) { showToast("Erro ao marcar como enviado: " + err.message, "error"); }
+  }
+
+  async function generateSinglePDF(entry, preloadedPhoto) {
+    const cliente = clientes.find((c) => c.id === entry.clienteId) || null;
+    const photo = preloadedPhoto !== undefined ? preloadedPhoto : entry.foto || null;
+    setPdfBusy(true);
+    try {
+      const blob = buildSinglePdfBlob(entry, cliente, photo);
+      const baseFilename = `RPV-${entry.cliente}-${entry.dataLevantamento}`.replace(/[^\w.\- ]/g, "");
+      const items = [{ blob, filename: `${baseFilename}.pdf` }];
+      if (photo && isPdfDataUrl(photo)) {
+        items.push({ blob: dataUrlToBlob(photo), filename: `${baseFilename}-comprovante-banco.pdf` });
+      }
+      await shareFiles(items, showToast);
+    } catch (err) {
+      showToast("Erro ao gerar o PDF: " + err.message, "error");
+    }
+    setPdfBusy(false);
+  }
+  async function generateBatchPDF(list, totals, periodoLabel) {
+    setPdfBusy(true);
+    try {
+      const blob = buildBatchPdfBlob(list, totals, periodoLabel);
+      const filename = `Relatorio-RPV-${todayISO()}.pdf`;
+      await sharePdfBlob(blob, filename, showToast);
+    } catch (err) {
+      showToast("Erro ao gerar o PDF: " + err.message, "error");
+    }
+    setPdfBusy(false);
+  }
+
+  function resetClientForm() { setClientForm(EMPTY_CLIENT_FORM); setEditingClienteId(null); }
+  function startEditCliente(cliente) {
+    setEditingClienteId(cliente.id);
+    setClientForm({
+      dataCadastro: cliente.dataCadastro || todayISO(), nome: cliente.nome, cpf: cliente.cpf || "",
+      numeroBeneficio: cliente.numeroBeneficio || "", processo: cliente.processo || "",
+      valorEstimado: cliente.valorEstimado ? String(cliente.valorEstimado) : "", dono: cliente.dono,
+      percentualExito: cliente.percentualExito ? String(cliente.percentualExito) : "30",
+      valorAdministrativo: cliente.valorAdministrativo ? String(cliente.valorAdministrativo) : "",
+      gastosReembolsaveis: cliente.gastosReembolsaveis ? String(cliente.gastosReembolsaveis) : "",
+      temSucumbencia: !!cliente.temSucumbencia, valorSucumbencial: cliente.valorSucumbencial ? String(cliente.valorSucumbencial) : "", obs: cliente.obs || "",
+    });
+  }
+
+  async function handleSubmitCliente(e) {
+    e.preventDefault();
+    if (!clientForm.nome.trim() || !clientForm.dono || !clientForm.percentualExito) {
+      showToast("Preencha nome, dono do cliente e percentual do êxito.", "error"); return;
+    }
+    setSavingCliente(true);
+    const id = editingClienteId || newId("cli");
+    const base = editingClienteId ? clientes.find((c) => c.id === editingClienteId) : null;
+    const cliente = {
+      id, dataCadastro: clientForm.dataCadastro || todayISO(), nome: clientForm.nome.trim(), cpf: clientForm.cpf.trim(),
+      numeroBeneficio: clientForm.numeroBeneficio.trim(), processo: clientForm.processo.trim(),
+      valorEstimado: parseNum(clientForm.valorEstimado), dono: clientForm.dono, percentualExito: parseNum(clientForm.percentualExito),
+      valorAdministrativo: parseNum(clientForm.valorAdministrativo), gastosReembolsaveis: parseNum(clientForm.gastosReembolsaveis), temSucumbencia: !!clientForm.temSucumbencia,
+      valorSucumbencial: parseNum(clientForm.valorSucumbencial), obs: clientForm.obs.trim(),
+      criadoEm: base ? base.criadoEm : Date.now(), editadoEm: Date.now(),
+    };
+    try {
+      await db.collection("clientes").doc(id).set(cliente);
+      showToast(editingClienteId ? "Cadastro atualizado." : "Cliente cadastrado.");
+      resetClientForm();
+    } catch (err) { showToast("Erro ao salvar cliente: " + err.message, "error"); }
+    setSavingCliente(false);
+  }
+
+  async function handleDeleteCliente(id) {
+    try { await db.collection("clientes").doc(id).delete(); showToast("Cadastro excluído."); if (editingClienteId === id) resetClientForm(); }
+    catch (err) { showToast("Erro ao excluir: " + err.message, "error"); }
+  }
+
+  if (user === undefined) {
+    return <div style={{ minHeight: "100vh", backgroundColor: C.ink, display: "flex", alignItems: "center", justifyContent: "center" }}><Spinner size={26} /></div>;
+  }
+  if (user === null) return <LoginScreen />;
+
+  const pendentes = entries.filter((en) => !en.enviado);
+  const totalPendente = pendentes.reduce((s, en) => s + (en.valorTotal || 0), 0);
+
+  return (
+    <div style={{ minHeight: "100vh", width: "100%", backgroundColor: C.parchment, fontFamily: FONT_SANS }}>
+      <header className="no-print" style={{ padding: "28px 20px 20px", backgroundColor: C.ink, borderBottom: `3px double ${C.brass}` }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <LogoMark size={38} />
+            <div>
+              <span style={{ fontFamily: FONT_SANS, fontSize: 11, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: C.brassSoft }}>Rezende Maia Advocacia</span>
+              <h1 style={{ fontFamily: FONT_SERIF, fontSize: 22, fontWeight: 700, color: "#fff", letterSpacing: "0.01em", marginTop: 1 }}>Controle de RPV</h1>
+            </div>
+          </div>
+          <button onClick={() => auth.signOut()} title="Sair" style={{ background: "none", border: "none", color: "#B7C2CE", cursor: "pointer", padding: 6 }}><Icon name="logout" size={18} /></button>
+        </div>
+        <p style={{ fontFamily: FONT_SANS, fontSize: 12, color: "#B7C2CE", marginTop: 8 }}>{user.email} · dados sincronizados entre seus aparelhos</p>
+      </header>
+
+      <main style={{ padding: "20px 16px 112px", maxWidth: 520, margin: "0 auto" }}>
+        {dataLoading ? (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "96px 0", color: C.inkSoft }}>
+            <Spinner size={20} color={C.inkSoft} /><span style={{ marginLeft: 8, fontFamily: FONT_SANS, fontSize: 14 }}>Carregando registros...</span>
+          </div>
+        ) : tab === "clientes" ? (
+          <ClientesTab clientes={clientes} clientForm={clientForm} setClientForm={setClientForm} onSubmit={handleSubmitCliente}
+            editingClienteId={editingClienteId} onCancelEdit={resetClientForm} onEdit={startEditCliente} onDelete={handleDeleteCliente} saving={savingCliente} />
+        ) : tab === "novo" ? (
+          <FormTab form={form} setForm={setForm} onSubmit={handleSubmit} editingId={editingId} onCancelEdit={resetForm}
+            photoDataUrl={photoDataUrl} setPhotoDataUrl={setPhotoDataUrl} photoBusy={photoBusy} fileInputRef={fileInputRef} valorInputRef={valorInputRef}
+            onPhotoFile={handlePhotoFile} responsaveisConhecidos={responsaveisConhecidos} clientes={clientes} saving={saving} showToast={showToast}
+            rateioManual={rateioManual} setRateioManual={setRateioManual} lastSaved={lastSaved} onNextEntry={nextEntry}
+            onGeneratePDF={(entry) => generateSinglePDF(entry, photoDataUrl)} pdfBusy={pdfBusy} />
+        ) : tab === "historico" ? (
+          <HistoricoTab entries={entries} pendentesCount={pendentes.length} totalPendente={totalPendente} onEdit={startEdit} onDelete={handleDelete} onGeneratePDF={(entry) => generateSinglePDF(entry)} pdfBusy={pdfBusy} />
+        ) : (
+          <RelatorioTab entries={entries} onMarkSent={markAsSent} showToast={showToast} onGeneratePDF={generateBatchPDF} pdfBusy={pdfBusy} />
+        )}
+      </main>
+
+      <Toast toast={toast} />
+
+      <nav className="no-print" style={{ position: "fixed", bottom: 0, left: 0, right: 0, display: "flex", backgroundColor: "#fff", borderTop: `1.5px solid ${C.rule}`, boxShadow: "0 -4px 14px rgba(31,44,61,0.06)" }}>
+        <NavButton active={tab === "clientes"} icon={<Icon name="users" size={18} />} label="Clientes" onClick={() => { if (tab !== "clientes") resetClientForm(); setTab("clientes"); }} />
+        <NavButton active={tab === "novo"} icon={<Icon name="plus" size={19} />} label="Novo" onClick={() => { if (tab !== "novo") resetForm(); setTab("novo"); }} />
+        <NavButton active={tab === "historico"} icon={<Icon name="clipboard" size={19} />} label="Histórico" badge={pendentes.length > 0 ? pendentes.length : null} onClick={() => setTab("historico")} />
+        <NavButton active={tab === "relatorio"} icon={<Icon name="send" size={18} />} label="Relatório" onClick={() => setTab("relatorio")} />
+      </nav>
+    </div>
+  );
+}
+
+function NavButton({ active, icon, label, onClick, badge }) {
+  return (
+    <button onClick={onClick} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4, position: "relative", padding: "10px 0 12px", background: "none", border: "none", cursor: "pointer" }}>
+      <span style={{ color: active ? C.brass : "#A6AFB9" }}>{icon}</span>
+      <span style={{ fontFamily: FONT_SANS, fontSize: 10.5, fontWeight: active ? 700 : 500, color: active ? C.ink : "#A6AFB9", letterSpacing: "0.02em" }}>{label}</span>
+      {badge && (
+        <span style={{ position: "absolute", top: 4, right: "calc(50% - 26px)", minWidth: 16, height: 16, borderRadius: 999, backgroundColor: C.red, color: "#fff", fontSize: 9.5, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 3px" }}>{badge}</span>
+      )}
+    </button>
+  );
+}
+
+// ---------- Boot ----------
+const rootEl = document.getElementById("root");
+const root = ReactDOM.createRoot(rootEl);
+root.render(FIREBASE_READY ? <RPVLedgerApp /> : <SetupScreen />);
+</script>
+
+<script>
+  if (window.__FIREBASE_CONFIG__ && window.__FIREBASE_CONFIG__.apiKey.indexOf("COLOQUE_AQUI") === -1) {
+    if ("serviceWorker" in navigator) {
+      // Quando uma versão nova do app assume o controle, recarrega a página
+      // automaticamente uma vez para exibir a atualização (evita ficar
+      // "preso" numa versão antiga em cache).
+      let alreadyReloaded = false;
+      navigator.serviceWorker.addEventListener("controllerchange", () => {
+        if (alreadyReloaded) return;
+        alreadyReloaded = true;
+        window.location.reload();
+      });
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("./sw.js").catch(() => {});
+      });
+    }
+  }
+</script>
+</body>
+</html>
