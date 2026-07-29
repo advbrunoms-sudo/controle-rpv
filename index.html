@@ -194,11 +194,11 @@ const BANCOS = {
 };
 const DONOS = { Bruno: { label: "Dr. Bruno" }, "Flávio": { label: "Dr. Flávio" } };
 
-function computeSplit({ valorTotal, percentualExito, dono, sucumbencial, valorAdministrativo }) {
+function computeSplit({ valorTotal, percentualExito, dono, sucumbencial, valorAdministrativo, valorGastos }) {
   const total = Number(valorTotal) || 0;
   const donoIsBruno = dono === "Bruno";
   if (sucumbencial) {
-    return { escritorio: 0, cliente: 0, flavio: donoIsBruno ? 0 : total, bruno: donoIsBruno ? total : 0, honorarioTotal: total, baseDivisivel: 0, excedente: total, administrativoAplicado: 0 };
+    return { escritorio: 0, cliente: 0, flavio: donoIsBruno ? 0 : total, bruno: donoIsBruno ? total : 0, honorarioTotal: total, baseDivisivel: 0, excedente: total, administrativoAplicado: 0, gastosAplicado: 0 };
   }
   const pct = (Number(percentualExito) || 0) / 100;
   const honorarioTotal = total * pct;
@@ -210,17 +210,25 @@ function computeSplit({ valorTotal, percentualExito, dono, sucumbencial, valorAd
 
   // Valor administrativo: sai do que sobraria para o cliente e vai integralmente
   // para o escritório (cliente do Bruno) ou para o Dr. Flávio (cliente dele).
-  const restanteParaCliente = Math.max(0, total - honorarioTotal);
-  const administrativoAplicado = Math.min(Math.max(0, Number(valorAdministrativo) || 0), restanteParaCliente);
+  let restante = Math.max(0, total - honorarioTotal);
+  const administrativoAplicado = Math.min(Math.max(0, Number(valorAdministrativo) || 0), restante);
   if (donoIsBruno) escritorio += administrativoAplicado;
   else donoShare += administrativoAplicado;
+  restante -= administrativoAplicado;
 
-  const clienteValor = Math.max(0, total - honorarioTotal - administrativoAplicado);
+  // Gastos reembolsáveis: dinheiro que o escritório já adiantou pelo cliente.
+  // Sai do que sobraria para o cliente e volta integralmente para o escritório,
+  // independentemente de quem é o dono do cliente.
+  const gastosAplicado = Math.min(Math.max(0, Number(valorGastos) || 0), restante);
+  escritorio += gastosAplicado;
+  restante -= gastosAplicado;
+
+  const clienteValor = restante;
   return {
     escritorio, cliente: clienteValor,
     flavio: donoIsBruno ? outroShare : donoShare,
     bruno: donoIsBruno ? donoShare : outroShare,
-    honorarioTotal, baseDivisivel, excedente, administrativoAplicado,
+    honorarioTotal, baseDivisivel, excedente, administrativoAplicado, gastosAplicado,
   };
 }
 function administrativoDestino(dono) { return dono === "Flávio" ? "Dr. Flávio (integral)" : "Escritório (integral)"; }
@@ -231,17 +239,19 @@ const EMPTY_FORM = {
 };
 const EMPTY_CLIENT_FORM = {
   dataCadastro: todayISO(), nome: "", cpf: "", numeroBeneficio: "", processo: "", valorEstimado: "",
-  dono: "Bruno", percentualExito: "30", valorAdministrativo: "", temSucumbencia: false, valorSucumbencial: "", obs: "",
+  dono: "Bruno", percentualExito: "30", valorAdministrativo: "", gastosReembolsaveis: "", temSucumbencia: false, valorSucumbencial: "", obs: "",
 };
 
 // ---------- Small UI atoms ----------
 function LogoMark({ size = 40 }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 64 64" style={{ flexShrink: 0 }}>
-      <circle cx="32" cy="32" r="30" fill="none" stroke={C.brass} strokeWidth="1.5" />
-      <circle cx="32" cy="32" r="26" fill="none" stroke={C.brass} strokeWidth="0.75" opacity="0.6" />
-      <text x="32" y="40" textAnchor="middle" style={{ fontFamily: FONT_SERIF, fontSize: "22px", fontWeight: 700, fill: C.brassSoft }}>RM</text>
-    </svg>
+    <img
+      src="./logo-mark.png"
+      alt="Rezende Maia Advocacia"
+      width={size}
+      height={size}
+      style={{ flexShrink: 0, width: size, height: size, borderRadius: "50%", objectFit: "contain" }}
+    />
   );
 }
 function BankBadge({ banco }) {
@@ -390,9 +400,9 @@ function LoginScreen() {
 }
 
 // ---------- Fee breakdown preview ----------
-function FeeBreakdown({ dono, percentualExito, valorEstimado, valorAdministrativo }) {
+function FeeBreakdown({ dono, percentualExito, valorEstimado, valorAdministrativo, valorGastos }) {
   const valor = parseNum(valorEstimado);
-  const split = computeSplit({ valorTotal: valor, percentualExito, dono, sucumbencial: false, valorAdministrativo });
+  const split = computeSplit({ valorTotal: valor, percentualExito, dono, sucumbencial: false, valorAdministrativo, valorGastos });
   const donoLabel = dono === "Flávio" ? "Dr. Flávio" : "Dr. Bruno";
   const outroLabel = dono === "Flávio" ? "Dr. Bruno" : "Dr. Flávio";
   const donoTotal = dono === "Flávio" ? split.flavio : split.bruno;
@@ -414,9 +424,18 @@ function FeeBreakdown({ dono, percentualExito, valorEstimado, valorAdministrativ
           <BreakdownRow label={`${donoLabel}, dono do cliente (50% + excedente)`} value={donoTotal} bold />
           <BreakdownRow label={`${outroLabel}, outro sócio (10% do divisível)`} value={outroTotal} bold />
           <BreakdownRow label="Cliente recebe" value={split.cliente} />
-          {split.administrativoAplicado > 0 && (
-            <div style={{ fontFamily: FONT_SANS, fontSize: 11.5, color: "#B7C2CE", marginTop: 6, lineHeight: 1.5 }}>
-              Já inclui {formatBRL(split.administrativoAplicado)} de valor administrativo, descontado do cliente e somado {donoIsBrunoLocal ? "ao escritório" : `a ${donoLabel}`} acima.
+          {(split.administrativoAplicado > 0 || split.gastosAplicado > 0) && (
+            <div style={{ marginTop: 6 }}>
+              {split.administrativoAplicado > 0 && (
+                <div style={{ fontFamily: FONT_SANS, fontSize: 11.5, color: "#B7C2CE", lineHeight: 1.5 }}>
+                  Já inclui {formatBRL(split.administrativoAplicado)} de valor administrativo, descontado do cliente e somado {donoIsBrunoLocal ? "ao escritório" : `a ${donoLabel}`} acima.
+                </div>
+              )}
+              {split.gastosAplicado > 0 && (
+                <div style={{ fontFamily: FONT_SANS, fontSize: 11.5, color: "#B7C2CE", lineHeight: 1.5, marginTop: split.administrativoAplicado > 0 ? 4 : 0 }}>
+                  Já inclui {formatBRL(split.gastosAplicado)} de gastos reembolsáveis, descontados do cliente e somados ao escritório acima.
+                </div>
+              )}
             </div>
           )}
         </React.Fragment>
@@ -510,6 +529,15 @@ function ClientesTab({ clientes, clientForm, setClientForm, onSubmit, editingCli
             <Icon name="info" size={13} color={C.inkSoft} />
             <span style={{ fontFamily: FONT_SANS, fontSize: 11.5, color: C.inkSoft }}>Administrativo do Dr. Flávio vai 100% para ele. Administrativo de cliente do Dr. Bruno vai 100% para o escritório.</span>
           </div>
+
+          <Field label="Gastos reembolsáveis">
+            <MoneyInput value={clientForm.gastosReembolsaveis} onChange={(e) => set("gastosReembolsaveis", e.target.value)} />
+          </Field>
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "8px 12px", borderRadius: 8, backgroundColor: C.parchmentDark, marginBottom: 12 }}>
+            <Icon name="info" size={13} color={C.inkSoft} />
+            <span style={{ fontFamily: FONT_SANS, fontSize: 11.5, color: C.inkSoft }}>Gastos que o escritório adiantou pelo cliente (perícia, deslocamento, etc.). Ao sair o RPV/precatório, esse valor é descontado do cliente e volta integralmente para o escritório.</span>
+          </div>
+
           <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, cursor: "pointer" }}>
             <input type="checkbox" checked={clientForm.temSucumbencia} onChange={(e) => set("temSucumbencia", e.target.checked)} style={{ width: 16, height: 16, accentColor: C.brass }} />
             <span style={{ fontFamily: FONT_SANS, fontSize: 13, color: C.ink }}>Possui honorários sucumbenciais</span>
@@ -524,7 +552,7 @@ function ClientesTab({ clientes, clientForm, setClientForm, onSubmit, editingCli
         </div>
 
         <div style={{ marginBottom: 14 }}>
-          <FeeBreakdown dono={clientForm.dono} percentualExito={clientForm.percentualExito} valorEstimado={clientForm.valorEstimado} valorAdministrativo={clientForm.valorAdministrativo} />
+          <FeeBreakdown dono={clientForm.dono} percentualExito={clientForm.percentualExito} valorEstimado={clientForm.valorEstimado} valorAdministrativo={clientForm.valorAdministrativo} valorGastos={clientForm.gastosReembolsaveis} />
         </div>
 
         {clientForm.temSucumbencia && (
@@ -587,9 +615,10 @@ function ClientCard({ cliente, onEdit, confirmingDelete, onAskDelete, onCancelDe
           {cliente.numeroBeneficio && <div style={{ marginTop: 12, fontFamily: FONT_SANS, fontSize: 12.5, color: C.inkSoft }}>NB: <strong style={{ color: C.ink }}>{cliente.numeroBeneficio}</strong></div>}
           {cliente.processo && <div style={{ marginTop: 4, fontFamily: FONT_SANS, fontSize: 12.5, color: C.inkSoft }}>Processo: <strong style={{ color: C.ink, fontFamily: FONT_MONO }}>{cliente.processo}</strong></div>}
           {cliente.valorAdministrativo > 0 && <div style={{ marginTop: 4, fontFamily: FONT_SANS, fontSize: 12.5, color: C.inkSoft }}>Administrativo: <strong style={{ color: C.ink }}>{formatBRL(cliente.valorAdministrativo)}</strong> · {administrativoDestino(cliente.dono)}</div>}
+          {cliente.gastosReembolsaveis > 0 && <div style={{ marginTop: 4, fontFamily: FONT_SANS, fontSize: 12.5, color: C.inkSoft }}>Gastos reembolsáveis: <strong style={{ color: C.ink }}>{formatBRL(cliente.gastosReembolsaveis)}</strong> · voltam para o escritório</div>}
           {cliente.obs && <div style={{ marginTop: 4, fontFamily: FONT_SANS, fontSize: 12.5, color: C.inkSoft, fontStyle: "italic" }}>“{cliente.obs}”</div>}
           <div style={{ marginTop: 12 }}>
-            <FeeBreakdown dono={cliente.dono} percentualExito={cliente.percentualExito} valorEstimado={cliente.valorEstimado} valorAdministrativo={cliente.valorAdministrativo} />
+            <FeeBreakdown dono={cliente.dono} percentualExito={cliente.percentualExito} valorEstimado={cliente.valorEstimado} valorAdministrativo={cliente.valorAdministrativo} valorGastos={cliente.gastosReembolsaveis} />
           </div>
           {cliente.temSucumbencia && (
             <div style={{ marginTop: 10 }}>
@@ -629,6 +658,11 @@ function AutoRateioPreview({ split }) {
           Inclui {formatBRL(split.administrativoAplicado)} de valor administrativo, descontado do cliente.
         </div>
       )}
+      {split.gastosAplicado > 0 && (
+        <div style={{ fontFamily: FONT_SANS, fontSize: 11, color: C.inkSoft, marginTop: 4 }}>
+          Inclui {formatBRL(split.gastosAplicado)} de gastos reembolsáveis, descontados do cliente.
+        </div>
+      )}
     </div>
   );
 }
@@ -638,7 +672,7 @@ function FormTab({ form, setForm, onSubmit, editingId, onCancelEdit, photoDataUr
   const [showDetails, setShowDetails] = useState(false);
   function set(field, value) { setForm((f) => ({ ...f, [field]: value })); }
   const linkedClient = clientes.find((c) => c.id === form.clienteId) || null;
-  const autoSplit = linkedClient && !rateioManual ? computeSplit({ valorTotal: parseNum(form.valorTotal), percentualExito: linkedClient.percentualExito, dono: linkedClient.dono, sucumbencial: form.sucumbencial, valorAdministrativo: linkedClient.valorAdministrativo }) : null;
+  const autoSplit = linkedClient && !rateioManual ? computeSplit({ valorTotal: parseNum(form.valorTotal), percentualExito: linkedClient.percentualExito, dono: linkedClient.dono, sucumbencial: form.sucumbencial, valorAdministrativo: linkedClient.valorAdministrativo, valorGastos: linkedClient.gastosReembolsaveis }) : null;
   const somaManual = parseNum(form.valorEscritorio) + parseNum(form.valorCliente) + parseNum(form.valorFlavio) + parseNum(form.valorBruno);
   const diffManual = Math.round((parseNum(form.valorTotal) - somaManual) * 100) / 100;
   const showDiffWarning = !autoSplit && form.valorTotal && Math.abs(diffManual) > 0.01;
@@ -1318,7 +1352,7 @@ function RPVLedgerApp() {
 
     let valores;
     if (linkedClient && !rateioManual) {
-      const split = computeSplit({ valorTotal: parseNum(form.valorTotal), percentualExito: linkedClient.percentualExito, dono: linkedClient.dono, sucumbencial: form.sucumbencial, valorAdministrativo: linkedClient.valorAdministrativo });
+      const split = computeSplit({ valorTotal: parseNum(form.valorTotal), percentualExito: linkedClient.percentualExito, dono: linkedClient.dono, sucumbencial: form.sucumbencial, valorAdministrativo: linkedClient.valorAdministrativo, valorGastos: linkedClient.gastosReembolsaveis });
       valores = { valorEscritorio: split.escritorio, valorCliente: split.cliente, valorFlavio: split.flavio, valorBruno: split.bruno };
     } else {
       valores = { valorEscritorio: parseNum(form.valorEscritorio), valorCliente: parseNum(form.valorCliente), valorFlavio: parseNum(form.valorFlavio), valorBruno: parseNum(form.valorBruno) };
@@ -1397,6 +1431,7 @@ function RPVLedgerApp() {
       valorEstimado: cliente.valorEstimado ? String(cliente.valorEstimado) : "", dono: cliente.dono,
       percentualExito: cliente.percentualExito ? String(cliente.percentualExito) : "30",
       valorAdministrativo: cliente.valorAdministrativo ? String(cliente.valorAdministrativo) : "",
+      gastosReembolsaveis: cliente.gastosReembolsaveis ? String(cliente.gastosReembolsaveis) : "",
       temSucumbencia: !!cliente.temSucumbencia, valorSucumbencial: cliente.valorSucumbencial ? String(cliente.valorSucumbencial) : "", obs: cliente.obs || "",
     });
   }
@@ -1413,7 +1448,7 @@ function RPVLedgerApp() {
       id, dataCadastro: clientForm.dataCadastro || todayISO(), nome: clientForm.nome.trim(), cpf: clientForm.cpf.trim(),
       numeroBeneficio: clientForm.numeroBeneficio.trim(), processo: clientForm.processo.trim(),
       valorEstimado: parseNum(clientForm.valorEstimado), dono: clientForm.dono, percentualExito: parseNum(clientForm.percentualExito),
-      valorAdministrativo: parseNum(clientForm.valorAdministrativo), temSucumbencia: !!clientForm.temSucumbencia,
+      valorAdministrativo: parseNum(clientForm.valorAdministrativo), gastosReembolsaveis: parseNum(clientForm.gastosReembolsaveis), temSucumbencia: !!clientForm.temSucumbencia,
       valorSucumbencial: parseNum(clientForm.valorSucumbencial), obs: clientForm.obs.trim(),
       criadoEm: base ? base.criadoEm : Date.now(), editadoEm: Date.now(),
     };
