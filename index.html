@@ -187,6 +187,27 @@ function compressImage(file, maxW = 1000, quality = 0.7) {
     reader.readAsDataURL(file);
   });
 }
+function readFileAsDataURL(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("Falha ao ler arquivo"));
+    reader.onload = (e) => resolve(e.target.result);
+    reader.readAsDataURL(file);
+  });
+}
+function isPdfDataUrl(url) {
+  return typeof url === "string" && url.indexOf("data:application/pdf") === 0;
+}
+function dataUrlToBlob(dataUrl) {
+  const [meta, base64] = dataUrl.split(",");
+  const mimeMatch = meta.match(/data:(.*?);base64/);
+  const mime = mimeMatch ? mimeMatch[1] : "application/octet-stream";
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return new Blob([bytes], { type: mime });
+}
+const MAX_PDF_BYTES = 700 * 1024;
 
 const BANCOS = {
   CEF: { label: "Caixa Econômica Federal", short: "CEF", color: C.cef, accent: C.cefAccent },
@@ -786,21 +807,28 @@ function FormTab({ form, setForm, onSubmit, editingId, onCancelEdit, photoDataUr
 
       <div style={cardStyle}>
         <span style={sectionLabelStyle}>Comprovante do banco</span>
-        <input type="file" accept="image/*" capture="environment" ref={fileInputRef} onChange={onPhotoFile} style={{ display: "none" }} />
+        <input type="file" accept="image/*,application/pdf" capture="environment" ref={fileInputRef} onChange={onPhotoFile} style={{ display: "none" }} />
         {photoDataUrl ? (
           <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
-            <div style={{ width: 92, height: 92, borderRadius: 8, overflow: "hidden", border: `1px solid ${C.rule}`, transform: "rotate(-1.5deg)", boxShadow: "0 2px 6px rgba(31,44,61,0.15)", flexShrink: 0 }}>
-              <img src={photoDataUrl} alt="Comprovante" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-            </div>
+            {isPdfDataUrl(photoDataUrl) ? (
+              <div style={{ width: 92, height: 92, borderRadius: 8, border: `1px solid ${C.rule}`, transform: "rotate(-1.5deg)", boxShadow: "0 2px 6px rgba(31,44,61,0.15)", flexShrink: 0, backgroundColor: C.parchmentDark, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4 }}>
+                <Icon name="clipboard" size={24} color={C.brassDark} />
+                <span style={{ fontFamily: FONT_SANS, fontSize: 10, fontWeight: 700, color: C.brassDark }}>PDF</span>
+              </div>
+            ) : (
+              <div style={{ width: 92, height: 92, borderRadius: 8, overflow: "hidden", border: `1px solid ${C.rule}`, transform: "rotate(-1.5deg)", boxShadow: "0 2px 6px rgba(31,44,61,0.15)", flexShrink: 0 }}>
+                <img src={photoDataUrl} alt="Comprovante" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              </div>
+            )}
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              <button type="button" onClick={() => fileInputRef.current && fileInputRef.current.click()} style={{ fontFamily: FONT_SANS, fontSize: 12.5, fontWeight: 600, color: C.brassDark, background: "none", border: `1.5px solid ${C.brass}`, borderRadius: 7, padding: "6px 10px", cursor: "pointer" }}>Tirar outra foto</button>
-              <button type="button" onClick={() => setPhotoDataUrl(null)} style={{ fontFamily: FONT_SANS, fontSize: 12.5, color: C.red, background: "none", border: "none", padding: "0 2px", cursor: "pointer", textAlign: "left" }}>Remover foto</button>
+              <button type="button" onClick={() => fileInputRef.current && fileInputRef.current.click()} style={{ fontFamily: FONT_SANS, fontSize: 12.5, fontWeight: 600, color: C.brassDark, background: "none", border: `1.5px solid ${C.brass}`, borderRadius: 7, padding: "6px 10px", cursor: "pointer" }}>Trocar arquivo</button>
+              <button type="button" onClick={() => setPhotoDataUrl(null)} style={{ fontFamily: FONT_SANS, fontSize: 12.5, color: C.red, background: "none", border: "none", padding: "0 2px", cursor: "pointer", textAlign: "left" }}>Remover</button>
             </div>
           </div>
         ) : (
           <button type="button" onClick={() => fileInputRef.current && fileInputRef.current.click()} disabled={photoBusy} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: 18, borderRadius: 10, border: `2px dashed ${C.brass}`, backgroundColor: C.brassSoft, color: C.brassDark, fontFamily: FONT_SANS, fontSize: 14.5, fontWeight: 700, cursor: "pointer" }}>
             {photoBusy ? <Spinner size={18} color={C.brassDark} /> : <Icon name="camera" size={18} />}
-            {photoBusy ? "Processando foto..." : "Tirar foto do comprovante"}
+            {photoBusy ? "Processando..." : "Tirar foto ou anexar PDF do comprovante"}
           </button>
         )}
       </div>
@@ -914,7 +942,13 @@ function EntryCard({ entry, index, expanded, onToggle, onEdit, onGeneratePDF, pd
           {entry.obs && <div style={{ marginTop: 4, fontFamily: FONT_SANS, fontSize: 12.5, color: C.inkSoft, fontStyle: "italic" }}>“{entry.obs}”</div>}
           {entry.foto && (
             <div style={{ marginTop: 12 }}>
-              <img src={entry.foto} alt="Comprovante" style={{ maxWidth: 160, borderRadius: 8, border: `1px solid ${C.rule}`, transform: "rotate(-1deg)", boxShadow: "0 2px 6px rgba(31,44,61,0.15)" }} />
+              {isPdfDataUrl(entry.foto) ? (
+                <a href={entry.foto} download={`comprovante-${entry.cliente}.pdf`} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 12px", borderRadius: 8, border: `1px solid ${C.rule}`, backgroundColor: "#fff", color: C.ink, fontFamily: FONT_SANS, fontSize: 12.5, fontWeight: 600, textDecoration: "none" }}>
+                  <Icon name="clipboard" size={14} /> Ver comprovante (PDF)
+                </a>
+              ) : (
+                <img src={entry.foto} alt="Comprovante" style={{ maxWidth: 160, borderRadius: 8, border: `1px solid ${C.rule}`, transform: "rotate(-1deg)", boxShadow: "0 2px 6px rgba(31,44,61,0.15)" }} />
+              )}
             </div>
           )}
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
@@ -1170,7 +1204,7 @@ function buildSinglePdfBlob(entry, cliente, photo) {
     doc.text(lines, 40, y); y += lines.length * 13 + 10;
   }
 
-  if (photo) {
+  if (photo && !isPdfDataUrl(photo)) {
     try {
       if (y > 620) { doc.addPage(); y = 60; }
       const props = doc.getImageProperties(photo);
@@ -1180,6 +1214,11 @@ function buildSinglePdfBlob(entry, cliente, photo) {
       doc.text("COMPROVANTE EMITIDO PELO BANCO", 40, y); y += 12;
       doc.addImage(photo, "JPEG", 40, y, w, h);
     } catch (e) { /* imagem inválida — ignora silenciosamente */ }
+  } else if (photo && isPdfDataUrl(photo)) {
+    doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.setTextColor(...PDF_SOFT);
+    doc.text("COMPROVANTE EMITIDO PELO BANCO", 40, y); y += 14;
+    doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.setTextColor(...PDF_INK);
+    doc.text("Anexado em arquivo PDF separado.", 40, y);
   }
 
   pdfFooter(doc);
@@ -1237,27 +1276,36 @@ function buildBatchPdfBlob(list, totals, periodoLabel) {
   return doc.output("blob");
 }
 
-async function sharePdfBlob(blob, filename, showToast) {
+async function shareFiles(items, showToast) {
+  // items: [{ blob, filename }, ...]
   try {
-    const file = new File([blob], filename, { type: "application/pdf" });
-    if (navigator.canShare && navigator.canShare({ files: [file] })) {
-      await navigator.share({ files: [file], title: filename });
+    const files = items.map((it) => new File([it.blob], it.filename, { type: "application/pdf" }));
+    if (navigator.canShare && navigator.canShare({ files })) {
+      await navigator.share({ files, title: items[0].filename });
       return;
     }
   } catch (err) {
     if (err && err.name === "AbortError") return; // usuário cancelou o compartilhamento
     // se o compartilhamento falhar por outro motivo, cai no download abaixo
   }
-  try {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url; a.download = filename;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(url), 30000);
-    if (showToast) showToast("PDF baixado. Verifique a pasta de downloads ou o app Arquivos.");
-  } catch (err) {
-    if (showToast) showToast("Não foi possível gerar o PDF neste navegador.", "error");
+  let anyFailed = false;
+  for (const it of items) {
+    try {
+      const url = URL.createObjectURL(it.blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = it.filename;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 30000);
+    } catch (err) {
+      anyFailed = true;
+    }
   }
+  if (showToast) {
+    showToast(anyFailed ? "Não foi possível gerar o PDF neste navegador." : "Arquivo(s) baixado(s). Verifique a pasta de downloads ou o app Arquivos.", anyFailed ? "error" : "success");
+  }
+}
+async function sharePdfBlob(blob, filename, showToast) {
+  return shareFiles([{ blob, filename }], showToast);
 }
 
 // ---------- Main App ----------
@@ -1335,8 +1383,19 @@ function RPVLedgerApp() {
     e.target.value = "";
     if (!file) return;
     setPhotoBusy(true);
-    try { setPhotoDataUrl(await compressImage(file)); }
-    catch (err) { showToast("Não foi possível processar a foto.", "error"); }
+    try {
+      if (file.type === "application/pdf") {
+        if (file.size > MAX_PDF_BYTES) {
+          showToast(`PDF muito grande (máx. ${Math.round(MAX_PDF_BYTES / 1024)} KB). Tente um arquivo menor.`, "error");
+        } else {
+          setPhotoDataUrl(await readFileAsDataURL(file));
+        }
+      } else {
+        setPhotoDataUrl(await compressImage(file));
+      }
+    } catch (err) {
+      showToast("Não foi possível processar o arquivo.", "error");
+    }
     setPhotoBusy(false);
   }
 
@@ -1403,8 +1462,12 @@ function RPVLedgerApp() {
     setPdfBusy(true);
     try {
       const blob = buildSinglePdfBlob(entry, cliente, photo);
-      const filename = `RPV-${entry.cliente}-${entry.dataLevantamento}.pdf`.replace(/[^\w.\- ]/g, "");
-      await sharePdfBlob(blob, filename, showToast);
+      const baseFilename = `RPV-${entry.cliente}-${entry.dataLevantamento}`.replace(/[^\w.\- ]/g, "");
+      const items = [{ blob, filename: `${baseFilename}.pdf` }];
+      if (photo && isPdfDataUrl(photo)) {
+        items.push({ blob: dataUrlToBlob(photo), filename: `${baseFilename}-comprovante-banco.pdf` });
+      }
+      await shareFiles(items, showToast);
     } catch (err) {
       showToast("Erro ao gerar o PDF: " + err.message, "error");
     }
