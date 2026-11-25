@@ -1,4 +1,4 @@
-const CACHE_NAME = "rpv-shell-v7";
+const CACHE_NAME = "rpv-shell-v8";
 const SHELL_ASSETS = ["./manifest.json", "./icon-192.png", "./icon-512.png", "./apple-touch-icon.png", "./logo-mark.png"];
 
 self.addEventListener("install", (event) => {

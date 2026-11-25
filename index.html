@@ -55,12 +55,12 @@
   // ⚙️ Configurações do projeto > seus apps > SDK setup and configuration
   // ------------------------------------------------------------------
   window.__FIREBASE_CONFIG__ = {
-    apiKey: "AIzaSyAWcwHAFLTLQ1fW2G94hAfuD4zN34ecQ2A",
-  authDomain: "controlerpv-9a502.firebaseapp.com",
-  projectId: "controlerpv-9a502",
-  storageBucket: "controlerpv-9a502.firebasestorage.app",
-  messagingSenderId: "633816371066",
-  appId: "1:633816371066:web:f7b7d804b0ee8c1e1e50c3"
+    apiKey: "COLOQUE_AQUI_A_API_KEY",
+    authDomain: "COLOQUE_AQUI.firebaseapp.com",
+    projectId: "COLOQUE_AQUI_O_PROJECT_ID",
+    storageBucket: "COLOQUE_AQUI.appspot.com",
+    messagingSenderId: "COLOQUE_AQUI",
+    appId: "COLOQUE_AQUI"
   };
 </script>
 
@@ -111,6 +111,8 @@ const ICON_PATHS = {
   info: <g><circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" /></g>,
   printer: <g><polyline points="6 9 6 2 18 2 18 9" /><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" /><rect x="6" y="14" width="12" height="8" /></g>,
   arrowRight: <g><line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" /></g>,
+  fileText: <g><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="8" y1="13" x2="16" y2="13" /><line x1="8" y1="17" x2="16" y2="17" /></g>,
+  download: <g><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></g>,
   logout: <g><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></g>,
 };
 function Icon({ name, size = 18, color = "currentColor", strokeWidth = 2 }) {
@@ -394,6 +396,219 @@ function pendenciaTexto(entry, cliente, entries) {
 }
 function administrativoDestino(dono) { return dono === "Flávio" ? "Dr. Flávio (integral)" : "Escritório (integral)"; }
 
+const LOGO_TIMBRE = "data:image/jpeg;base64,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";
+
+// ---------- Prestação de contas: arquivos, detalhamento e validação ----------
+const ESPECIES_BENEFICIO = [
+  "Aposentadoria por incapacidade permanente", "Auxílio por incapacidade temporária", "Auxílio-acidente",
+  "Aposentadoria por idade rural", "Aposentadoria por idade", "Salário-maternidade", "Pensão por morte",
+  "BPC/LOAS — pessoa idosa", "BPC/LOAS — pessoa com deficiência",
+];
+const PC_FORMAS = ["PIX", "TED", "Transferência bancária", "Outra"];
+const PC_CIDADE_PADRAO = "Presidente Tancredo Neves/BA";
+const PC_MESES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
+
+function dataUrlToBytes(dataUrl) {
+  const comma = dataUrl.indexOf(",");
+  const meta = dataUrl.slice(0, comma);
+  const bin = atob(dataUrl.slice(comma + 1));
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  const m = meta.match(/data:([^;]+)/);
+  return { bytes, mime: m ? m[1] : "application/octet-stream" };
+}
+function loadPdfLib() {
+  if (window.PDFLib) return Promise.resolve(window.PDFLib);
+  if (loadPdfLib._p) return loadPdfLib._p;
+  loadPdfLib._p = new Promise((resolve, reject) => {
+    const sc = document.createElement("script");
+    sc.src = "https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js";
+    sc.onload = () => { if (window.PDFLib) resolve(window.PDFLib); else { loadPdfLib._p = null; reject(new Error("o gerador de PDF não carregou")); } };
+    sc.onerror = () => { loadPdfLib._p = null; reject(new Error("sem internet para carregar o gerador de PDF")); };
+    document.head.appendChild(sc);
+  });
+  return loadPdfLib._p;
+}
+// Lê o arquivo de um anexo: da memória (recém-escolhido), do levantamento ou da coleção "anexos".
+async function resolverAnexo(item, entries) {
+  if (item.dataUrl) return dataUrlToBytes(item.dataUrl);
+  if (item.entryId) {
+    const en = (entries || []).find((e) => e.id === item.entryId);
+    if (en && en.foto) return dataUrlToBytes(en.foto);
+    throw new Error("não achei o comprovante do levantamento de " + (item.nome || ""));
+  }
+  if (item.id) {
+    const snap = await db.collection("anexos").doc(item.id).get();
+    if (snap.exists && snap.data().dataUrl) return dataUrlToBytes(snap.data().dataUrl);
+    throw new Error(`não achei o arquivo "${item.nome || item.id}"`);
+  }
+  throw new Error("anexo sem conteúdo");
+}
+// Grava no Firestore os arquivos novos. Devolve os itens com "id" (mantendo o dataUrl em memória para montar o PDF).
+async function guardarAnexos(items, clienteId, tipo) {
+  const out = [];
+  for (const it of items || []) {
+    if (it.id && !it.dataUrl) { out.push({ id: it.id, nome: it.nome, mime: it.mime }); continue; }
+    const id = it.id || newId("anx");
+    await db.collection("anexos").doc(id).set({ id, clienteId, tipo, nome: it.nome, mime: it.mime, dataUrl: it.dataUrl, criadoEm: Date.now() });
+    out.push({ id, nome: it.nome, mime: it.mime, dataUrl: it.dataUrl });
+  }
+  return out;
+}
+function semDataUrl(obj) { return JSON.parse(JSON.stringify(obj, (k, v) => (k === "dataUrl" ? undefined : v))); }
+function round2(n) { return Math.round((Number(n) || 0) * 100) / 100; }
+function bancoPrep(b) { return b === "BB" ? "no Banco do Brasil" : "na Caixa Econômica Federal"; }
+
+// Detalhe de um levantamento (quanto foi descontado do cliente em cada item).
+function detDeSplit(s, vP, vD, cliente) {
+  return {
+    bruto: round2(vP), destaque: round2(vD),
+    honorarios: round2(cliente.temDestaque ? (s.excedenteCliente || 0) : (s.honorarioTotal || 0)),
+    administrativo: round2(s.administrativoAplicado || 0), gastos: round2(s.gastosAplicado || 0),
+    admPendente: round2(s.administrativoPendente || 0),
+  };
+}
+// Usa o detalhe gravado no levantamento; se for um levantamento antigo, refaz o cálculo e confere com o que foi gravado.
+function detalheEntry(en, cliente, entries) {
+  if (en.det) return en.det;
+  if (!cliente) return null;
+  const parcial = en.tipoLevantamento && en.tipoLevantamento !== "completo";
+  const vP = parcial ? (en.valorPrincipal || 0) : (en.valorTotal || 0);
+  const vD = parcial ? (en.valorDestaque || 0) : 0;
+  const s = computeLevantamento({ cliente, vPrincipal: vP, vDestaque: vD, sucumbencial: false, parceiroJaPago: parceiroJaPagoDe(entries, cliente.id, en.id) });
+  if (Math.abs(s.cliente - (en.valorCliente || 0)) > 0.01 || Math.abs(s.escritorio - (en.valorEscritorio || 0)) > 0.01) return null;
+  return detDeSplit(s, vP, vD, cliente);
+}
+
+// Situação do cliente em cada etapa do fluxo (define em qual aba ele aparece).
+function situacaoCliente(c, entries, prestacoes) {
+  const st = statusLevantamento(c, entries);
+  const sucPend = !!c.temSucumbencia && !entries.some((e) => e.clienteId === c.id && e.sucumbencial);
+  const aguardandoLev = c.temDestaque ? !(st.principalFeito && st.destaqueFeito) : !st.principalFeito;
+  const temPrestacao = (prestacoes || []).some((p) => p.clienteId === c.id);
+  return { st, sucPend, aguardandoLev, pendenteLancar: aguardandoLev || sucPend, temPrestacao, prestacaoPendente: st.principalFeito && !temPrestacao };
+}
+
+function novoDraftPrestacao(cliente, entries) {
+  const gastos = (entries || []).filter((e) => e.clienteId === cliente.id && !e.sucumbencial).reduce((a, e) => {
+    const d = detalheEntry(e, cliente, entries); return a + (d ? d.gastos : 0);
+  }, 0);
+  return {
+    especie: cliente.especieBeneficio || "", dataContrato: cliente.dataContrato || "",
+    contrato: (cliente.contratoAnexos || []).map((a) => ({ ...a })),
+    despesas: gastos > 0 ? [{ key: newId("dp"), descricao: "", data: "", valor: String(round2(gastos)), anexos: [] }] : [],
+    outros: [],
+    repasse: { data: todayISO(), forma: "PIX", valor: "", favorecido: cliente.nome + (cliente.cpf ? " — CPF " + cliente.cpf : ""), anexos: [] },
+    cidadeUf: PC_CIDADE_PADRAO, dataDecl: todayISO(),
+  };
+}
+
+// Monta os números da prestação e lista o que falta (informações e documentos).
+function montarPrestacao({ cliente, entries, draft }) {
+  const info = [], docs = [];
+  const meus = entries.filter((e) => e.clienteId === cliente.id && !e.sucumbencial).sort((a, b) => (a.dataLevantamento || "").localeCompare(b.dataLevantamento || ""));
+
+  if (!cliente.nome) info.push("Nome do cliente");
+  if (!(cliente.cpf || "").trim()) info.push("CPF do cliente (cadastro do cliente)");
+  if (!(cliente.processo || "").trim()) info.push("Nº do processo (cadastro do cliente)");
+  if (!(draft.especie || "").trim()) info.push("Espécie do benefício");
+  if (!draft.dataContrato) info.push("Data de assinatura do contrato de honorários");
+  if (!(cliente.percentualExito > 0)) info.push("Percentual de êxito do contrato (cadastro do cliente)");
+
+  let bruto = 0, hon = 0, adm = 0, gast = 0, dest = 0, admPend = 0;
+  const levs = [];
+  meus.forEach((en) => {
+    const det = detalheEntry(en, cliente, entries);
+    const rotulo = `${formatDateBR(en.dataLevantamento)} (${formatBRL(en.valorTotal)})`;
+    if (!det) { info.push(`Levantamento de ${rotulo}: não consegui detalhar os descontos (foi lançado com rateio manual ou antes desta função). Abra em Histórico → Levantamentos → Editar, toque em "Usar cálculo automático" e salve de novo`); return; }
+    if (Math.abs(det.bruto - det.honorarios - det.administrativo - det.gastos - (en.valorCliente || 0)) > 0.02) {
+      info.push(`Levantamento de ${rotulo}: os descontos não batem com o valor do cliente. Abra em Histórico → Levantamentos → Editar, toque em "Usar cálculo automático" e salve de novo`); return;
+    }
+    bruto += det.bruto; hon += det.honorarios; adm += det.administrativo; gast += det.gastos; dest += det.destaque || 0; admPend += det.admPendente || 0;
+    levs.push({ en, det });
+  });
+  const levsCliente = levs.filter((l) => l.det.bruto > 0);
+  if (levsCliente.length === 0 && meus.length === levs.length) info.push("Levantamento do valor do cliente (nenhum foi lançado ainda)");
+
+  // Outros descontos
+  const outros = (draft.outros || []).filter((o) => (o.descricao || "").trim() || parseNum(o.valor) > 0);
+  outros.forEach((o, i) => {
+    if (!(o.descricao || "").trim()) info.push(`Outros descontos, item ${i + 1}: descreva o desconto`);
+    if (!(parseNum(o.valor) > 0)) info.push(`Outros descontos, item ${i + 1}: informe o valor`);
+  });
+  const outrosTotal = round2(outros.reduce((a, o) => a + parseNum(o.valor), 0));
+
+  // Despesas reembolsáveis
+  const desp = (draft.despesas || []).filter((d) => (d.descricao || "").trim() || parseNum(d.valor) > 0 || d.data || (d.anexos || []).length > 0);
+  desp.forEach((d, i) => {
+    const nome = (d.descricao || "").trim() || `item ${i + 1}`;
+    if (!(d.descricao || "").trim()) info.push(`Despesa ${i + 1}: descreva a despesa`);
+    if (!d.data) info.push(`Despesa "${nome}": informe a data`);
+    if (!(parseNum(d.valor) > 0)) info.push(`Despesa "${nome}": informe o valor`);
+    if ((d.anexos || []).length === 0) docs.push(`Comprovante da despesa "${nome}"`);
+  });
+  const despTotal = round2(desp.reduce((a, d) => a + parseNum(d.valor), 0));
+  if (gast > 0 && desp.length === 0) info.push(`Despesas reembolsáveis: foram descontados ${formatBRL(gast)} do cliente — liste as despesas com valor, data e comprovante`);
+  else if (Math.abs(despTotal - gast) > 0.01) info.push(`As despesas listadas somam ${formatBRL(despTotal)}, mas o valor de gastos reembolsáveis descontado do cliente foi ${formatBRL(gast)}. Ajuste os itens (ou o campo "Gastos reembolsáveis" no cadastro do cliente)`);
+
+  const liquido = round2(bruto - hon - adm - gast - outrosTotal);
+  if (liquido < 0) info.push("O valor líquido ficou negativo: confira os descontos");
+
+  // Repasse
+  const rp = draft.repasse || {};
+  const rpValor = round2(parseNum(rp.valor));
+  if (!rp.data) info.push("Repasse: data da transferência ao cliente");
+  if (!(rp.forma || "").trim()) info.push("Repasse: forma (PIX, TED...)");
+  if (!(rp.favorecido || "").trim()) info.push("Repasse: favorecido (nome e CPF)");
+  if (!(rpValor > 0)) info.push("Repasse: valor transferido ao cliente");
+  else if (Math.abs(rpValor - liquido) > 0.01) info.push(`Repasse: o valor transferido (${formatBRL(rpValor)}) é diferente do líquido a repassar (${formatBRL(liquido)}) — saldo remanescente de ${formatBRL(round2(liquido - rpValor))}. Corrija o valor ou os descontos`);
+  if ((rp.anexos || []).length === 0) docs.push("Comprovante do repasse (transferência) ao cliente");
+  if (!(draft.cidadeUf || "").trim()) info.push("Cidade/UF da declaração");
+  if (!draft.dataDecl) info.push("Data da declaração");
+
+  // Documentos
+  if ((draft.contrato || []).length === 0) docs.push("Contrato de honorários assinado");
+  levsCliente.forEach((l) => { if (!l.en.foto) docs.push(`Comprovante do levantamento de ${formatDateBR(l.en.dataLevantamento)} (${BANCOS[l.en.banco] ? BANCOS[l.en.banco].short : l.en.banco}) — anexe em Histórico → Levantamentos → Editar`); });
+
+  // Texto do levantamento (banco + data)
+  const bancosDatas = [];
+  levsCliente.forEach((l) => { const t = `${bancoPrep(l.en.banco)} em ${formatDateBR(l.en.dataLevantamento)}`; if (bancosDatas.indexOf(t) < 0) bancosDatas.push(t); });
+  const pct = formatPct(cliente.percentualExito);
+
+  const notas = [];
+  if (cliente.temDestaque && dest + (cliente.valorDestaque || 0) > 0) {
+    const pl = planoDestaque(cliente, 0);
+    notas.push(`Honorários contratados: ${pct} de ${formatBRL(pl.T)} = ${formatBRL(pl.H)}. Desse total, ${formatBRL(Math.min(pl.D, pl.H))} foram destacados pelo juízo e levantados em separado (não saem do valor do cliente)${hon > 0 ? ` e ${formatBRL(hon)} foram descontados do valor do cliente` : ""}.`);
+  }
+  if (adminPagoDe(cliente) > 0) notas.push(`Do valor administrativo, ${formatBRL(adminPagoDe(cliente))} já tinham sido pagos pelo cliente e não foram descontados deste levantamento.`);
+  if (admPend > 0) notas.push(`Valor administrativo de ${formatBRL(admPend)} não coube no desconto do RPV (limite de 50%) e será acertado em separado, por cartão, boleto ou nota promissória.`);
+
+  const anexos = {
+    contrato: (draft.contrato || []).map((a) => ({ ...a, legenda: "Contrato de honorários" })),
+    levantamento: levs.filter((l) => l.en.foto).map((l) => ({ entryId: l.en.id, nome: `${BANCOS[l.en.banco] ? BANCOS[l.en.banco].short : l.en.banco} ${formatDateBR(l.en.dataLevantamento)}`, mime: isPdfDataUrl(l.en.foto) ? "application/pdf" : "image/jpeg", legenda: `Levantamento ${BANCOS[l.en.banco] ? BANCOS[l.en.banco].short : l.en.banco} em ${formatDateBR(l.en.dataLevantamento)}` })),
+    despesas: [], repasse: (rp.anexos || []).map((a) => ({ ...a, legenda: "Comprovante do repasse ao cliente" })),
+  };
+  desp.forEach((d) => (d.anexos || []).forEach((a) => anexos.despesas.push({ ...a, legenda: (d.descricao || "").trim() || "Despesa" })));
+
+  const dados = {
+    cliente: {
+      nome: cliente.nome, cpf: cliente.cpf || "", processo: cliente.processo || "", especie: (draft.especie || "").trim(),
+      dataContrato: draft.dataContrato || "", contratoTexto: `${cliente.valorAdministrativo > 0 ? "fixo + " : "apenas "}${pct}`,
+    },
+    despesas: desp.map((d) => ({ descricao: (d.descricao || "").trim(), data: d.data || "", valor: round2(parseNum(d.valor)) })),
+    despesasTotal: despTotal,
+    resumo: {
+      bruto: round2(bruto), levantamentoTexto: bancosDatas.join(" e "), administrativo: round2(adm), honorarios: round2(hon), pct,
+      despesas: round2(gast), outros: outrosTotal, outrosItens: outros.map((o) => ({ descricao: (o.descricao || "").trim(), valor: round2(parseNum(o.valor)) })), liquido,
+    },
+    notas,
+    repasse: { data: rp.data || "", forma: (rp.forma || "").trim(), favorecido: (rp.favorecido || "").trim(), valor: rpValor, saldo: round2(liquido - rpValor) },
+    cidadeUf: (draft.cidadeUf || "").trim(), dataDecl: draft.dataDecl || "",
+    anexos,
+  };
+  return { ok: info.length === 0 && docs.length === 0, info, docs, dados, levsCliente };
+}
+
 const EMPTY_FORM = {
   clienteId: "", cliente: "", processo: "", banco: "CEF", dataLevantamento: todayISO(), responsavel: "",
   valorTotal: "", valorEscritorio: "", valorCliente: "", valorFlavio: "", valorBruno: "", sucumbencial: false, obs: "",
@@ -404,6 +619,7 @@ const EMPTY_CLIENT_FORM = {
   dono: "Bruno", percentualExito: "30", valorAdministrativo: "", gastosReembolsaveis: "", temSucumbencia: false, valorSucumbencial: "", obs: "",
   parceiroNome: "", parceiroTipo: "percentual", parceiroValor: "",
   tipoRequisicao: "RPV", numeroRequisicao: "", temDestaque: false, valorDestaque: "", valorLiquido: "", administrativoPago: false, administrativoPagoValor: "",
+  especieBeneficio: "", dataContrato: "", contratoItens: [],
 };
 
 // ---------- Leitura do PDF do RPV / Precatório ----------
@@ -876,7 +1092,7 @@ function BreakdownRow({ label, value, bold, highlight }) {
 }
 
 // ---------- Clientes Tab ----------
-function ClientesTab({ clientes, entries, clientForm, setClientForm, onSubmit, editingClienteId, onCancelEdit, onEdit, onDelete, saving }) {
+function ClientesTab({ clientes, entries, clientForm, setClientForm, onSubmit, editingClienteId, onCancelEdit, onEdit, onDelete, saving, showToast }) {
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [leitura, setLeitura] = useState(null); // { busy, erro, found, texto, vazio }
   const [verTexto, setVerTexto] = useState(false);
@@ -1037,6 +1253,16 @@ function ClientesTab({ clientes, entries, clientForm, setClientForm, onSubmit, e
         </div>
 
         <div style={cardStyle}>
+          <span style={sectionLabelStyle}>Benefício e contrato de honorários</span>
+          <ContratoFields especie={clientForm.especieBeneficio} dataContrato={clientForm.dataContrato} contrato={clientForm.contratoItens}
+            onChange={(f, v) => set(f === "especie" ? "especieBeneficio" : f === "contrato" ? "contratoItens" : f, v)} showToast={showToast} />
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "8px 12px", borderRadius: 8, backgroundColor: C.parchmentDark }}>
+            <Icon name="info" size={13} color={C.inkSoft} />
+            <span style={{ fontFamily: FONT_SANS, fontSize: 11.5, color: C.inkSoft }}>Esses dados vão para a prestação de contas. Podem ser preenchidos agora ou só na hora de gerar a prestação.</span>
+          </div>
+        </div>
+
+        <div style={cardStyle}>
           <span style={sectionLabelStyle}>Valores a serem cobrados</span>
           <div style={gridTwo}>
             <Field label="Percentual do êxito" required hint="Padrão do escritório: 30%">
@@ -1151,11 +1377,11 @@ function ClientesTab({ clientes, entries, clientForm, setClientForm, onSubmit, e
 
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
         <Icon name="users" size={15} color={C.brassDark} />
-        <span style={{ fontFamily: FONT_SERIF, fontSize: 13, fontWeight: 700, color: C.brassDark, textTransform: "uppercase", letterSpacing: "0.06em" }}>Clientes cadastrados ({clientes.length})</span>
+        <span style={{ fontFamily: FONT_SERIF, fontSize: 13, fontWeight: 700, color: C.brassDark, textTransform: "uppercase", letterSpacing: "0.06em" }}>Aguardando levantamento ({clientes.length})</span>
       </div>
 
       {clientes.length === 0 ? (
-        <EmptyState title="Nenhum cliente cadastrado" text="Cadastre o cliente com antecedência para agilizar o levantamento no banco." />
+        <EmptyState title="Nenhum cliente aguardando levantamento" text="Cadastre o cliente com antecedência para agilizar o levantamento no banco. Clientes já levantados ficam em Histórico → Clientes." />
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 16 }}>
           {clientes.map((c) => (
@@ -1169,7 +1395,7 @@ function ClientesTab({ clientes, entries, clientForm, setClientForm, onSubmit, e
   );
 }
 
-function ClientCard({ cliente, entries, onEdit, confirmingDelete, onAskDelete, onCancelDelete, onConfirmDelete }) {
+function ClientCard({ cliente, entries, prestacoes, onEdit, confirmingDelete, onAskDelete, onCancelDelete, onConfirmDelete }) {
   const [expanded, setExpanded] = useState(false);
   return (
     <div style={{ backgroundColor: C.card, border: `1px solid ${C.ruleSoft}`, borderLeft: `4px solid ${cliente.dono === "Flávio" ? C.blue : C.brass}`, borderRadius: 10, overflow: "hidden" }}>
@@ -1201,6 +1427,8 @@ function ClientCard({ cliente, entries, onEdit, confirmingDelete, onAskDelete, o
                 {cliente.temDestaque
                   ? [chip(st.principalFeito, st.principalFeito ? `${reqLabel(cliente.tipoRequisicao)} levantado` : `${reqLabel(cliente.tipoRequisicao)} pendente`), chip(st.destaqueFeito, st.destaqueFeito ? "Destaque levantado" : "Destaque pendente")]
                   : chip(st.principalFeito, st.principalFeito ? "Levantado" : "Aguardando levantamento")}
+                {cliente.temSucumbencia && (() => { const ok = (entries || []).some((e) => e.clienteId === cliente.id && e.sucumbencial); return chip(ok, ok ? "Sucumbência levantada" : "Sucumbência a levantar"); })()}
+                {prestacoes && st.principalFeito && (() => { const ok = prestacoes.some((p) => p.clienteId === cliente.id); return chip(ok, ok ? "Prestação de contas gerada" : "Prestação pendente"); })()}
               </div>
             );
           })()}
@@ -1275,7 +1503,7 @@ function AutoRateioPreview({ split }) {
 }
 
 // ---------- Novo / Editar Levantamento Tab ----------
-function FormTab({ form, setForm, onSubmit, editingId, onCancelEdit, photoDataUrl, setPhotoDataUrl, photoBusy, fileInputRef, valorInputRef, onPhotoFile, responsaveisConhecidos, clientes, entries, saving, showToast, rateioManual, setRateioManual, lastSaved, onNextEntry, onGeneratePDF, pdfBusy }) {
+function FormTab({ form, setForm, onSubmit, editingId, onCancelEdit, photoDataUrl, setPhotoDataUrl, photoBusy, fileInputRef, valorInputRef, onPhotoFile, responsaveisConhecidos, clientes, entries, saving, showToast, rateioManual, setRateioManual, lastSaved, onNextEntry, onGeneratePDF, pdfBusy, clientesOpcoes }) {
   const [showDetails, setShowDetails] = useState(false);
   function set(field, value) { setForm((f) => ({ ...f, [field]: value })); }
   const linkedClient = clientes.find((c) => c.id === form.clienteId) || null;
@@ -1332,7 +1560,7 @@ function FormTab({ form, setForm, onSubmit, editingId, onCancelEdit, photoDataUr
       <div style={cardStyle}>
         <span style={sectionLabelStyle}>Cliente</span>
         {clientes.length > 0 ? (
-          <Field label="Selecione o cliente cadastrado" required>
+          <Field label="Selecione o cliente cadastrado" required hint={(clientesOpcoes || []).length === 0 ? "Todos os clientes cadastrados já foram levantados (veja em Histórico → Clientes)." : undefined}>
             <select value={form.clienteId} onChange={(e) => {
                 const id = e.target.value;
                 const c = clientes.find((cl) => cl.id === id);
@@ -1341,7 +1569,7 @@ function FormTab({ form, setForm, onSubmit, editingId, onCancelEdit, photoDataUr
                 if (id) setTimeout(() => valorInputRef.current && valorInputRef.current.focus(), 60);
               }} style={{ ...inputBase, appearance: "none", fontSize: 16, fontWeight: 600 }}>
               <option value="">— selecionar —</option>
-              {clientes.map((c) => (<option key={c.id} value={c.id}>{c.nome}{c.cpf ? ` — ${c.cpf}` : ""}</option>))}
+              {(clientesOpcoes || clientes).map((c) => (<option key={c.id} value={c.id}>{c.nome}{c.cpf ? ` — ${c.cpf}` : ""}</option>))}
             </select>
           </Field>
         ) : (
@@ -1497,29 +1725,6 @@ function FormTab({ form, setForm, onSubmit, editingId, onCancelEdit, photoDataUr
   );
 }
 
-// ---------- Histórico Tab ----------
-function HistoricoTab({ entries, pendentesCount, totalPendente, onEdit, onDelete, onGeneratePDF, pdfBusy }) {
-  const [expandedId, setExpandedId] = useState(null);
-  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
-  if (entries.length === 0) return <EmptyState title="Nenhum levantamento registrado" text="Toque em “Novo” para registrar o primeiro levantamento de RPV." />;
-  return (
-    <div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, padding: "10px 14px", borderRadius: 8, backgroundColor: C.card, border: `1px solid ${C.ruleSoft}` }}>
-        <span style={{ fontFamily: FONT_SANS, fontSize: 12.5, color: C.inkSoft }}>{entries.length} registro(s) · {pendentesCount} pendente(s)</span>
-        <span style={{ fontFamily: FONT_MONO, fontSize: 13, fontWeight: 700, color: C.brassDark }}>{formatBRL(totalPendente)}</span>
-      </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-        {entries.map((en, i) => (
-          <EntryCard key={en.id} entry={en} index={entries.length - i} expanded={expandedId === en.id} onToggle={() => setExpandedId(expandedId === en.id ? null : en.id)}
-            onEdit={() => onEdit(en)} onGeneratePDF={() => onGeneratePDF(en)} pdfBusy={pdfBusy} confirmingDelete={confirmDeleteId === en.id}
-            onAskDelete={() => setConfirmDeleteId(en.id)} onCancelDelete={() => setConfirmDeleteId(null)}
-            onConfirmDelete={() => { onDelete(en.id); setConfirmDeleteId(null); }} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
 function EntryCard({ entry, index, expanded, onToggle, onEdit, onGeneratePDF, pdfBusy, confirmingDelete, onAskDelete, onCancelDelete, onConfirmDelete }) {
   return (
     <div style={{ backgroundColor: C.card, border: `1px solid ${C.ruleSoft}`, borderLeft: `4px solid ${C.brass}`, borderRadius: 10, overflow: "hidden" }}>
@@ -1657,8 +1862,18 @@ function RelatorioTab({ entries, clientes, onMarkSent, showToast, onGeneratePDF,
 
   async function copyReport() {
     const text = reportText();
-    try { await navigator.clipboard.writeText(text); showToast("Relatório copiado. Cole no WhatsApp ou e-mail para o financeiro e Dr. Flávio."); }
+    try {
+      await navigator.clipboard.writeText(text);
+      const ids = lista.filter((en) => !en.enviado).map((en) => en.id);
+      if (ids.length > 0) await onMarkSent(ids, `Relatório copiado. ${ids.length} registro(s) movido(s) para o Histórico.`);
+      else showToast("Relatório copiado. Cole no WhatsApp ou e-mail para o financeiro e Dr. Flávio.");
+    }
     catch (e) { showToast("Não copiou automaticamente — selecione o texto do relatório manualmente.", "error"); setShowPreview(true); }
+  }
+  async function emitirPdf() {
+    const ok = await onGeneratePDF(listaP, totals, periodoLabel);
+    const ids = lista.filter((en) => !en.enviado).map((en) => en.id);
+    if (ok && ids.length > 0) await onMarkSent(ids, `Relatório emitido. ${ids.length} registro(s) movido(s) para o Histórico.`);
   }
   function toggleSelect(id) { setSelecionados((prev) => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; }); }
 
@@ -1672,12 +1887,12 @@ function RelatorioTab({ entries, clientes, onMarkSent, showToast, onGeneratePDF,
         </div>
         <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
           <input type="checkbox" checked={apenasPendentes} onChange={(e) => setApenasPendentes(e.target.checked)} style={{ width: 16, height: 16, accentColor: C.brass }} />
-          <span style={{ fontFamily: FONT_SANS, fontSize: 13, color: C.ink }}>Somente pendentes de envio</span>
+          <span style={{ fontFamily: FONT_SANS, fontSize: 13, color: C.ink }}>Ocultar os já emitidos em relatório (ficam no Histórico)</span>
         </label>
       </div>
 
       {filtrados.length === 0 ? (
-        <EmptyState title="Nada por aqui" text="Nenhum levantamento encontrado para os filtros selecionados." />
+        <EmptyState title="Nada pendente de relatório" text="Os levantamentos já emitidos em relatório ficam no Histórico. Desmarque “Ocultar os já emitidos” para vê-los aqui." />
       ) : (
         <React.Fragment>
           <div style={cardStyle}>
@@ -1714,7 +1929,7 @@ function RelatorioTab({ entries, clientes, onMarkSent, showToast, onGeneratePDF,
             <button onClick={copyReport} disabled={lista.length === 0} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: C.ink, color: "#fff", fontFamily: FONT_SANS, fontSize: 13.5, fontWeight: 700, padding: 13, borderRadius: 10, border: "none", cursor: lista.length === 0 ? "default" : "pointer", opacity: lista.length === 0 ? 0.5 : 1 }}>
               <Icon name="copy" size={15} /> Copiar texto
             </button>
-            <button onClick={() => onGeneratePDF(listaP, totals, periodoLabel)} disabled={lista.length === 0 || pdfBusy} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: "#fff", color: C.ink, fontFamily: FONT_SANS, fontSize: 13.5, fontWeight: 700, padding: 13, borderRadius: 10, border: `1.5px solid ${C.rule}`, cursor: (lista.length === 0 || pdfBusy) ? "default" : "pointer", opacity: (lista.length === 0 || pdfBusy) ? 0.5 : 1 }}>
+            <button onClick={emitirPdf} disabled={lista.length === 0 || pdfBusy} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: "#fff", color: C.ink, fontFamily: FONT_SANS, fontSize: 13.5, fontWeight: 700, padding: 13, borderRadius: 10, border: `1.5px solid ${C.rule}`, cursor: (lista.length === 0 || pdfBusy) ? "default" : "pointer", opacity: (lista.length === 0 || pdfBusy) ? 0.5 : 1 }}>
               {pdfBusy ? <Spinner size={15} color={C.ink} /> : <Icon name="printer" size={15} />} {pdfBusy ? "Gerando..." : "Baixar PDF"}
             </button>
           </div>
@@ -1943,10 +2158,10 @@ async function shareFiles(items, showToast) {
     const files = items.map((it) => new File([it.blob], it.filename, { type: it.type || "application/pdf" }));
     if (navigator.canShare && navigator.canShare({ files })) {
       await navigator.share({ files, title: items[0].filename });
-      return;
+      return true;
     }
   } catch (err) {
-    if (err && err.name === "AbortError") return; // usuário cancelou o compartilhamento
+    if (err && err.name === "AbortError") return false; // usuário cancelou o compartilhamento
     // se o compartilhamento falhar por outro motivo, cai no download abaixo
   }
   let anyFailed = false;
@@ -1964,9 +2179,593 @@ async function shareFiles(items, showToast) {
   if (showToast) {
     showToast(anyFailed ? "Não foi possível gerar o PDF neste navegador." : "Arquivo(s) baixado(s). Verifique a pasta de downloads ou o app Arquivos.", anyFailed ? "error" : "success");
   }
+  return !anyFailed;
 }
 async function sharePdfBlob(blob, filename, showToast) {
   return shareFiles([{ blob, filename }], showToast);
+}
+
+// ---------- PDF da prestação de contas (modelo do escritório) + anexos juntos num arquivo só ----------
+const PC_GREEN = [47, 79, 62], PC_CREAM = [246, 241, 230], PC_BEIGE = [232, 224, 203], PC_GOLD = [184, 146, 58], PC_GRAY = [90, 90, 90], PC_INK = [42, 48, 50], PC_RULE = [217, 210, 191];
+const PC_ESCRITORIO = "BRUNO MAIA DE SOUSA SOCIEDADE INDIVIDUAL DE ADVOCACIA";
+const PC_CNPJ = "60.490.982/0001-79";
+
+function pcHeader(doc, drawn) {
+  const n = doc.internal.getCurrentPageInfo().pageNumber;
+  if (drawn.has(n)) return;
+  drawn.add(n);
+  doc.addImage(LOGO_TIMBRE, "JPEG", 40, 24, 92, 66);
+  const linhas = [["TEL / WHATSAPP", "(73) 98257-2931  |  (73) 98170-0219"], ["E-MAIL", "contato@rezendemaia.com.br"], ["INSTAGRAM", "@rezendemaiaadvogados"], ["SITE", "rezendemaia.com.br"]];
+  let y = 40;
+  linhas.forEach(([k, v]) => {
+    doc.setFont("helvetica", "normal"); doc.setFontSize(7.5); doc.setTextColor(...PC_INK);
+    const w = doc.getTextWidth(v);
+    doc.text(v, 555, y, { align: "right" });
+    doc.setFont("helvetica", "bold"); doc.setTextColor(...PC_GOLD);
+    doc.text(k, 555 - w - 6, y, { align: "right" });
+    y += 12;
+  });
+  doc.setDrawColor(...PC_GRAY); doc.setLineWidth(0.6); doc.line(40, 98, 555, 98);
+}
+function pcNovaPagina(doc, drawn) { doc.addPage(); pcHeader(doc, drawn); return 118; }
+function pcGarante(doc, drawn, y, h) { return y + h > 790 ? pcNovaPagina(doc, drawn) : y; }
+function pcSecao(doc, y, num, titulo) {
+  doc.setFillColor(...PC_CREAM); doc.rect(40, y, 515, 17, "F");
+  doc.setFillColor(...PC_GREEN); doc.rect(40, y, 17, 17, "F");
+  doc.setFont("times", "bold"); doc.setFontSize(10); doc.setTextColor(255, 255, 255);
+  doc.text(String(num), 48.5, y + 12, { align: "center" });
+  doc.setTextColor(...PC_GREEN); doc.setFontSize(9.5);
+  doc.text(titulo, 66, y + 12, { charSpace: 1.2 });
+  doc.setDrawColor(...PC_GREEN); doc.setLineWidth(0.5); doc.line(40, y + 17, 555, y + 17);
+  return y + 23;
+}
+function pcCheck(doc, x, y, marcado) {
+  doc.setDrawColor(...PC_GREEN); doc.setLineWidth(0.7); doc.rect(x, y, 7, 7);
+  if (marcado) { doc.setLineWidth(1.2); doc.line(x + 1.4, y + 3.8, x + 3, y + 5.6); doc.line(x + 3, y + 5.6, x + 6.2, y + 1.6); }
+}
+function pcDataExtenso(iso) {
+  const p = (iso || "").split("-");
+  if (p.length !== 3) return "";
+  return `${parseInt(p[2], 10)} de ${PC_MESES[parseInt(p[1], 10) - 1] || ""} de ${p[0]}`;
+}
+function waSafe(s) { return String(s == null ? "" : s).replace(/[–—]/g, "-").replace(/•/g, "-").replace(/[^\x20-\x7E\xA0-\xFF]/g, "?"); }
+
+// Página(s) da prestação, com o mesmo layout do modelo do escritório.
+function buildPrestacaoBase(dados) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: "pt", format: "a4" });
+  const drawn = new Set();
+  pcHeader(doc, drawn);
+  const M = { left: 40, right: 40, top: 118, bottom: 50 };
+  const estilo = { font: "helvetica", fontSize: 8.5, cellPadding: { top: 3.4, bottom: 3.4, left: 6, right: 6 }, textColor: PC_INK, lineColor: PC_RULE, lineWidth: 0.5, valign: "middle", overflow: "linebreak" };
+  const tabela = (opts) => {
+    doc.autoTable({ theme: "grid", styles: estilo, margin: M, didDrawPage: () => pcHeader(doc, drawn), ...opts });
+    return doc.lastAutoTable.finalY;
+  };
+  const lab = (t) => ({ content: t, styles: { fontStyle: "bold", textColor: PC_GREEN, fontSize: 7.2, fillColor: PC_BEIGE } });
+  const cl = dados.cliente, rs = dados.resumo, rp = dados.repasse;
+
+  // Títulos
+  doc.setFont("helvetica", "bold"); doc.setFontSize(11); doc.setTextColor(...PC_GREEN);
+  doc.text("DEMONSTRATIVO DE", 297.5, 120, { align: "center", charSpace: 3 });
+  doc.setFont("times", "bold"); doc.setFontSize(21);
+  doc.text("PRESTAÇÃO DE CONTAS", 297.5, 143, { align: "center", charSpace: 2 });
+  doc.setFont("times", "italic"); doc.setFontSize(9.5); doc.setTextColor(...PC_GRAY);
+  doc.text("Honorários advocatícios e valores recebidos em nome do cliente", 297.5, 157, { align: "center" });
+
+  let y = 168;
+  // 1. Identificação
+  y = pcSecao(doc, y, 1, "IDENTIFICAÇÃO");
+  y = tabela({
+    startY: y, columnStyles: { 0: { cellWidth: 78 }, 1: { cellWidth: 170 }, 2: { cellWidth: 60 }, 3: { cellWidth: 206 } },
+    body: [
+      [lab("CLIENTE"), { content: cl.nome, styles: { fontStyle: "bold" } }, lab("CPF"), cl.cpf],
+      [lab("PROCESSO Nº"), cl.processo, lab("BENEFÍCIO"), cl.especie],
+      [lab("CONTRATO DE HONORÁRIOS"), { content: `Assinado em ${formatDateBR(cl.dataContrato)} – ${cl.contratoTexto}`, colSpan: 3 }],
+    ],
+  }) + 9;
+
+  // 2. Despesas reembolsáveis
+  y = pcGarante(doc, drawn, y, 90);
+  y = pcSecao(doc, y, 2, "DESPESAS REEMBOLSÁVEIS");
+  const linhasDesp = dados.despesas.length > 0
+    ? dados.despesas.map((d) => [d.descricao, formatDateBR(d.data), formatBRL(d.valor)])
+    : [["Nenhuma despesa reembolsável.", "—", formatBRL(0)]];
+  y = tabela({
+    startY: y, showFoot: "lastPage",
+    head: [["DESCRIÇÃO / COMPROVANTE", "DATA", "VALOR"]],
+    headStyles: { fillColor: PC_GREEN, textColor: [255, 255, 255], fontStyle: "bold", fontSize: 7.2 },
+    columnStyles: { 0: { cellWidth: 334 }, 1: { cellWidth: 80, halign: "center" }, 2: { cellWidth: 100, halign: "right" } },
+    alternateRowStyles: { fillColor: PC_CREAM },
+    body: linhasDesp,
+    foot: [[{ content: "Total de despesas", colSpan: 2, styles: { halign: "right" } }, { content: formatBRL(dados.despesasTotal), styles: { halign: "right" } }]],
+    footStyles: { fillColor: PC_BEIGE, textColor: PC_INK, fontStyle: "bold" },
+  }) + 9;
+
+  // 3. Resumo financeiro
+  y = pcGarante(doc, drawn, y, 150);
+  y = pcSecao(doc, y, 3, "RESUMO FINANCEIRO");
+  const outrosTxt = rs.outrosItens.length > 0 ? ` (${rs.outrosItens.map((o) => `${o.descricao}: ${formatBRL(o.valor)}`).join("; ")})` : "";
+  y = tabela({
+    startY: y, columnStyles: { 0: { cellWidth: 394 }, 1: { cellWidth: 120, halign: "right" } },
+    body: [
+      [`Valor bruto recebido – levantado ${rs.levantamentoTexto}`, formatBRL(rs.bruto)],
+      ["(–) Honorários – fase administrativa", formatBRL(rs.administrativo)],
+      [`(–) Honorários – fase judicial (contratuais) – ${rs.pct}`, formatBRL(rs.honorarios)],
+      ["(–) Despesas reembolsáveis", formatBRL(rs.despesas)],
+      [`(–) Outros descontos autorizados${outrosTxt}`, formatBRL(rs.outros)],
+      [{ content: "VALOR LÍQUIDO A REPASSAR AO CLIENTE", styles: { fillColor: PC_GREEN, textColor: [255, 255, 255], fontStyle: "bold", fontSize: 10, cellPadding: { top: 7, bottom: 7, left: 6, right: 6 } } },
+        { content: formatBRL(rs.liquido), styles: { fillColor: PC_GREEN, textColor: [255, 255, 255], fontStyle: "bold", fontSize: 10, cellPadding: { top: 7, bottom: 7, left: 6, right: 6 } } }],
+    ],
+  }) + 6;
+  if (dados.notas.length > 0) {
+    doc.setFont("helvetica", "italic"); doc.setFontSize(7.6); doc.setTextColor(...PC_GRAY);
+    dados.notas.forEach((n) => {
+      const ls = doc.splitTextToSize("Obs.: " + n, 515);
+      y = pcGarante(doc, drawn, y, ls.length * 10 + 2);
+      doc.setFont("helvetica", "italic"); doc.setFontSize(7.6); doc.setTextColor(...PC_GRAY);
+      doc.text(ls, 40, y + 7);
+      y += ls.length * 10 + 3;
+    });
+  }
+  y += 4;
+
+  // 4. Repasse
+  y = pcGarante(doc, drawn, y, 90);
+  y = pcSecao(doc, y, 4, "REPASSE AO CLIENTE");
+  y = tabela({
+    startY: y, columnStyles: { 0: { cellWidth: 78 }, 1: { cellWidth: 170 }, 2: { cellWidth: 78 }, 3: { cellWidth: 188 } },
+    body: [
+      [lab("DATA DO REPASSE"), formatDateBR(rp.data), lab("FORMA"), rp.forma],
+      [lab("FAVORECIDO"), rp.favorecido, lab("SALDO REMANESCENTE"), { content: formatBRL(rp.saldo), styles: { fontStyle: "bold" } }],
+    ],
+  }) + 9;
+
+  // 5. Declaração e ciência
+  y = pcGarante(doc, drawn, y, 186);
+  y = pcSecao(doc, y, 5, "DECLARAÇÃO E CIÊNCIA");
+  doc.setFont("helvetica", "normal"); doc.setFontSize(9.2); doc.setTextColor(...PC_INK);
+  const decl = doc.splitTextToSize("O(a) cliente declara ter recebido o valor líquido indicado neste demonstrativo, ter conferido os cálculos e ter tido suas dúvidas esclarecidas pelo escritório. Fica ressalvado o direito de solicitar esclarecimentos complementares a qualquer tempo.", 515);
+  doc.text(decl, 40, y + 5, { lineHeightFactor: 1.3 });
+  y += decl.length * 12 + 10;
+  doc.text(`${dados.cidadeUf}, ${pcDataExtenso(dados.dataDecl)}.`, 555, y, { align: "right" });
+  y += 32;
+  doc.setDrawColor(...PC_INK); doc.setLineWidth(0.6);
+  doc.line(55, y, 265, y); doc.line(330, y, 540, y);
+  doc.setFont("helvetica", "bold"); doc.setFontSize(7.6);
+  const esc = doc.splitTextToSize(PC_ESCRITORIO, 205);
+  doc.text(esc, 160, y + 11, { align: "center" });
+  doc.setFont("helvetica", "normal"); doc.setTextColor(...PC_GRAY);
+  doc.text(`CNPJ: ${PC_CNPJ}`, 160, y + 11 + esc.length * 9.2 + 2, { align: "center" });
+  doc.setFont("helvetica", "bold"); doc.setTextColor(...PC_INK);
+  const nomeLs = doc.splitTextToSize(cl.nome, 205);
+  doc.text(nomeLs, 435, y + 11, { align: "center" });
+  doc.setFont("helvetica", "normal"); doc.setTextColor(...PC_GRAY);
+  doc.text(`CPF ${cl.cpf}`, 435, y + 11 + nomeLs.length * 9.2 + 2, { align: "center" });
+  y += 11 + Math.max(esc.length, nomeLs.length) * 9.2 + 14;
+
+  // Lista de anexos
+  y = pcGarante(doc, drawn, y, 50);
+  doc.setFillColor(...PC_CREAM); doc.rect(40, y, 515, 40, "F");
+  const A = dados.anexos;
+  const itens = [
+    ["Anexo 1 – Contrato de honorários", A.contrato.length > 0, 50, y + 9], ["Anexo 3 – Comprovantes das despesas" + (A.despesas.length === 0 ? " (sem despesas)" : ""), A.despesas.length > 0, 305, y + 9],
+    ["Anexo 2 – Comprovante de levantamento", A.levantamento.length > 0, 50, y + 24], ["Anexo 4 – Comprovante do repasse", A.repasse.length > 0, 305, y + 24],
+  ];
+  doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(...PC_INK);
+  itens.forEach(([t, ok, x, yy]) => { pcCheck(doc, x, yy - 1, ok); doc.text(t, x + 12, yy + 5.4); });
+
+  // Rodapé de todas as páginas
+  const n = doc.internal.getNumberOfPages();
+  for (let i = 1; i <= n; i++) {
+    doc.setPage(i);
+    doc.setDrawColor(...PC_GOLD); doc.setLineWidth(0.8); doc.line(40, 800, 555, 800);
+    doc.setFont("helvetica", "normal"); doc.setFontSize(7); doc.setTextColor(...PC_GRAY);
+    doc.text("Travessa São Francisco, 54, Centro – Presidente Tancredo Neves/BA – CEP 45.416-000", 297.5, 811, { align: "center" });
+    doc.text(`Unidades: Presidente Tancredo Neves  •  Nova Ibiá  •  Teolândia        Página ${i} de ${n}`, 297.5, 821, { align: "center" });
+  }
+  return doc.output("arraybuffer");
+}
+
+// Junta: prestação + anexos (contrato, levantamento, despesas, repasse), cada grupo com uma folha de separação.
+async function buildPrestacaoPdfBlob(dados, entries) {
+  const lib = await loadPdfLib();
+  const { PDFDocument, StandardFonts, rgb } = lib;
+  const baseBytes = buildPrestacaoBase(dados);
+  const out = await PDFDocument.create();
+  out.setTitle("Prestação de contas — " + waSafe(dados.cliente.nome));
+  out.setAuthor("Rezende Maia Advocacia");
+  const base = await PDFDocument.load(baseBytes);
+  (await out.copyPages(base, base.getPageIndices())).forEach((p) => out.addPage(p));
+  const fBold = await out.embedFont(StandardFonts.HelveticaBold);
+  const fReg = await out.embedFont(StandardFonts.Helvetica);
+  const verde = rgb(PC_GREEN[0] / 255, PC_GREEN[1] / 255, PC_GREEN[2] / 255);
+  const dourado = rgb(PC_GOLD[0] / 255, PC_GOLD[1] / 255, PC_GOLD[2] / 255);
+  const cinza = rgb(0.35, 0.35, 0.35);
+  const A = dados.anexos;
+  const grupos = [["Contrato de honorários", A.contrato], ["Comprovante de levantamento", A.levantamento], ["Comprovantes das despesas", A.despesas], ["Comprovante do repasse", A.repasse]];
+
+  for (let gi = 0; gi < grupos.length; gi++) {
+    const [titulo, itens] = grupos[gi];
+    if (!itens || itens.length === 0) continue;
+    const num = gi + 1;
+    // folha de separação
+    const W = 595.28, H = 841.89;
+    const sep = out.addPage([W, H]);
+    sep.drawRectangle({ x: 0, y: H - 130, width: W, height: 130, color: verde });
+    sep.drawText(waSafe(`ANEXO ${num}`), { x: 50, y: H - 80, size: 34, font: fBold, color: rgb(1, 1, 1) });
+    sep.drawText(waSafe(titulo), { x: 50, y: H - 190, size: 22, font: fBold, color: verde });
+    sep.drawRectangle({ x: 50, y: H - 202, width: 60, height: 2.5, color: dourado });
+    sep.drawText(waSafe("Prestação de contas — " + dados.cliente.nome), { x: 50, y: H - 228, size: 11, font: fReg, color: cinza });
+    let ly = H - 260;
+    itens.forEach((it, i) => { sep.drawText(waSafe(`${i + 1}. ${it.legenda || it.nome || "arquivo"}`), { x: 50, y: ly, size: 10, font: fReg, color: cinza }); ly -= 15; });
+
+    for (let i = 0; i < itens.length; i++) {
+      const it = itens[i];
+      let arq;
+      try { arq = await resolverAnexo(it, entries); } catch (e) { throw new Error(`Anexo ${num} (${it.nome || it.legenda}): ${e.message}`); }
+      if (arq.mime === "application/pdf") {
+        try {
+          const src = await PDFDocument.load(arq.bytes, { ignoreEncryption: true });
+          (await out.copyPages(src, src.getPageIndices())).forEach((p) => out.addPage(p));
+        } catch (e) { throw new Error(`Anexo ${num}: não consegui juntar o PDF "${it.nome || it.legenda}" (${e.message}). Tente anexar uma foto das páginas.`); }
+      } else {
+        let img;
+        try { img = arq.mime === "image/png" ? await out.embedPng(arq.bytes) : await out.embedJpg(arq.bytes); }
+        catch (e) { throw new Error(`Anexo ${num}: não consegui ler a imagem "${it.nome || it.legenda}".`); }
+        const paisagem = img.width > img.height * 1.1;
+        const pw = paisagem ? H : W, ph = paisagem ? W : H, m = 28;
+        const page = out.addPage([pw, ph]);
+        const sc = Math.min((pw - 2 * m) / img.width, (ph - 2 * m - 12) / img.height);
+        const iw = img.width * sc, ih = img.height * sc;
+        page.drawImage(img, { x: (pw - iw) / 2, y: m + 12 + (ph - 2 * m - 12 - ih) / 2, width: iw, height: ih });
+        page.drawText(waSafe(`Anexo ${num} - ${titulo} | ${it.legenda || ""} | ${dados.cliente.nome} | arquivo ${i + 1}/${itens.length}`), { x: m, y: 16, size: 7, font: fReg, color: cinza });
+      }
+    }
+  }
+  const bytes = await out.save();
+  return new Blob([bytes], { type: "application/pdf" });
+}
+
+// ---------- Prestação de contas: telas ----------
+function fmtTs(ts) {
+  if (!ts) return "—";
+  const d = new Date(ts);
+  return `${formatDateBR(d.toISOString().slice(0, 10))} às ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+function nomeArquivoPrestacao(nome) {
+  return `Prestacao-de-Contas-${String(nome || "cliente").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^\w.\- ]/g, "").trim().replace(/\s+/g, "-")}.pdf`;
+}
+
+// Escolher fotos / PDFs de um documento (contrato, comprovantes...).
+function AnexoPicker({ items, onChange, showToast, texto, multiple }) {
+  const ref = useRef(null);
+  const [busy, setBusy] = useState(false);
+  const lista = items || [];
+  async function onFiles(e) {
+    const files = Array.from(e.target.files || []);
+    e.target.value = "";
+    if (files.length === 0) return;
+    setBusy(true);
+    const novos = [];
+    for (const file of files) {
+      try {
+        if (file.type === "application/pdf") {
+          if (file.size > MAX_PDF_BYTES) { showToast(`"${file.name}" é um PDF grande demais (máx. ${Math.round(MAX_PDF_BYTES / 1024)} KB). Tire foto das páginas ou comprima o PDF.`, "error"); continue; }
+          novos.push({ key: newId("a"), nome: file.name, mime: "application/pdf", dataUrl: await readFileAsDataURL(file) });
+        } else {
+          novos.push({ key: newId("a"), nome: file.name || "foto.jpg", mime: "image/jpeg", dataUrl: await compressImage(file, 1500, 0.72) });
+        }
+      } catch (err) { showToast("Não foi possível ler o arquivo " + (file.name || ""), "error"); }
+    }
+    setBusy(false);
+    if (novos.length > 0) onChange(multiple === false ? novos.slice(0, 1) : [...lista, ...novos]);
+  }
+  return (
+    <div style={{ marginTop: 4 }}>
+      <input type="file" accept="image/*,application/pdf" multiple={multiple !== false} ref={ref} onChange={onFiles} style={{ display: "none" }} />
+      {lista.map((it, i) => (
+        <div key={it.id || it.key || i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 8px", marginBottom: 6, borderRadius: 8, backgroundColor: C.greenSoft, border: `1px solid ${C.green}` }}>
+          {it.dataUrl && it.mime !== "application/pdf" ? (
+            <img src={it.dataUrl} alt="" style={{ width: 34, height: 34, objectFit: "cover", borderRadius: 5, flexShrink: 0 }} />
+          ) : (
+            <span style={{ width: 34, height: 34, borderRadius: 5, backgroundColor: "#fff", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon name={it.mime === "application/pdf" ? "clipboard" : "check"} size={16} color={C.green} /></span>
+          )}
+          <span style={{ flex: 1, minWidth: 0, fontFamily: FONT_SANS, fontSize: 12, color: C.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.nome || "arquivo"}</span>
+          <button type="button" onClick={() => onChange(lista.filter((_, j) => j !== i))} style={{ background: "none", border: "none", color: C.red, fontFamily: FONT_SANS, fontSize: 12, cursor: "pointer", padding: "4px 2px" }}>Remover</button>
+        </div>
+      ))}
+      <button type="button" onClick={() => ref.current && ref.current.click()} disabled={busy} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: 11, borderRadius: 9, border: `1.5px dashed ${C.brass}`, backgroundColor: C.brassSoft, color: C.brassDark, fontFamily: FONT_SANS, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+        {busy ? <Spinner size={15} color={C.brassDark} /> : <Icon name="camera" size={16} />}
+        {busy ? "Processando..." : (texto || (lista.length > 0 ? "Adicionar mais fotos / PDF" : "Tirar foto ou anexar PDF"))}
+      </button>
+    </div>
+  );
+}
+
+// Espécie do benefício + contrato de honorários (usado no cadastro e na prestação).
+function ContratoFields({ especie, dataContrato, contrato, onChange, showToast }) {
+  return (
+    <div>
+      <Field label="Espécie do benefício" required>
+        <TextInput list="especies-list" value={especie} onChange={(e) => onChange("especie", e.target.value)} placeholder="Ex.: Aposentadoria por incapacidade permanente" />
+        <datalist id="especies-list">{ESPECIES_BENEFICIO.map((x) => (<option key={x} value={x} />))}</datalist>
+      </Field>
+      <Field label="Data de assinatura do contrato de honorários" required>
+        <TextInput type="date" value={dataContrato} onChange={(e) => onChange("dataContrato", e.target.value)} />
+      </Field>
+      <Field label="Contrato de honorários assinado (foto ou PDF)" required hint="Obrigatório para gerar a prestação de contas. Vários arquivos/páginas são aceitos.">
+        <AnexoPicker items={contrato} onChange={(v) => onChange("contrato", v)} showToast={showToast} />
+      </Field>
+    </div>
+  );
+}
+
+function PcErros({ r }) {
+  return (
+    <div style={{ marginBottom: 12, padding: "12px 14px", borderRadius: 10, backgroundColor: C.redSoft, border: `1.5px solid ${C.red}` }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+        <Icon name="alert" size={17} color={C.red} />
+        <strong style={{ fontFamily: FONT_SANS, fontSize: 13.5, color: C.red }}>Prestação de contas NÃO gerada — falta o que está abaixo</strong>
+      </div>
+      {r.docs.length > 0 && (
+        <div style={{ marginBottom: 8 }}>
+          <div style={{ fontFamily: FONT_SANS, fontSize: 12, fontWeight: 700, color: C.red, textTransform: "uppercase", letterSpacing: "0.04em" }}>Documentos faltando</div>
+          <ul style={{ margin: "4px 0 0", paddingLeft: 18, fontFamily: FONT_SANS, fontSize: 12.5, color: C.ink, lineHeight: 1.5 }}>{r.docs.map((t, i) => <li key={i}>{t}</li>)}</ul>
+        </div>
+      )}
+      {r.info.length > 0 && (
+        <div>
+          <div style={{ fontFamily: FONT_SANS, fontSize: 12, fontWeight: 700, color: C.red, textTransform: "uppercase", letterSpacing: "0.04em" }}>Informações faltando ou incorretas</div>
+          <ul style={{ margin: "4px 0 0", paddingLeft: 18, fontFamily: FONT_SANS, fontSize: 12.5, color: C.ink, lineHeight: 1.5 }}>{r.info.map((t, i) => <li key={i}>{t}</li>)}</ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PrestacaoCard({ cliente, entries, draft, onOpen, setDraft, onGerar, busy, showToast }) {
+  const [expanded, setExpanded] = useState(false);
+  const [tentou, setTentou] = useState(false);
+  const errosRef = useRef(null);
+  const r = draft ? montarPrestacao({ cliente, entries, draft }) : null;
+  const upd = (patch) => setDraft((d) => ({ ...d, ...patch }));
+  const updRep = (patch) => setDraft((d) => ({ ...d, repasse: { ...d.repasse, ...patch } }));
+  const updDesp = (key, patch) => setDraft((d) => ({ ...d, despesas: d.despesas.map((x) => (x.key === key ? { ...x, ...patch } : x)) }));
+  const updOut = (key, patch) => setDraft((d) => ({ ...d, outros: d.outros.map((x) => (x.key === key ? { ...x, ...patch } : x)) }));
+  const miniBtn = { display: "flex", alignItems: "center", justifyContent: "center", gap: 6, width: "100%", padding: 10, borderRadius: 9, border: `1.5px solid ${C.rule}`, backgroundColor: "#fff", color: C.ink, fontFamily: FONT_SANS, fontSize: 13, fontWeight: 700, cursor: "pointer", marginBottom: 12 };
+
+  function toggle() { if (!expanded && !draft) onOpen(); setExpanded((v) => !v); }
+  function gerar() {
+    setTentou(true);
+    if (!r.ok) { setTimeout(() => errosRef.current && errosRef.current.scrollIntoView({ behavior: "smooth", block: "center" }), 60); return; }
+    onGerar(cliente, draft);
+  }
+  const sub = (txt) => <div style={{ fontFamily: FONT_SANS, fontSize: 11.5, color: C.inkSoft, marginBottom: 8, lineHeight: 1.45 }}>{txt}</div>;
+  const res = r ? r.dados.resumo : null;
+  const linhaRes = (lbl, v, forte) => (
+    <div style={{ display: "flex", justifyContent: "space-between", gap: 8, fontFamily: FONT_SANS, fontSize: forte ? 14 : 12.5, fontWeight: forte ? 700 : 400, color: forte ? C.ink : C.inkSoft, padding: "3px 0", borderTop: forte ? `1px solid ${C.rule}` : "none", marginTop: forte ? 4 : 0 }}>
+      <span>{lbl}</span><span style={{ fontFamily: FONT_MONO, color: C.ink }}>{formatBRL(v)}</span>
+    </div>
+  );
+
+  return (
+    <div style={{ backgroundColor: C.card, border: `1px solid ${C.ruleSoft}`, borderLeft: `4px solid ${cliente.dono === "Flávio" ? C.blue : C.brass}`, borderRadius: 10, overflow: "hidden" }}>
+      <button onClick={toggle} style={{ width: "100%", textAlign: "left", padding: "12px 14px", display: "flex", alignItems: "center", gap: 12, background: "none", border: "none", cursor: "pointer" }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <span style={{ fontFamily: FONT_SERIF, fontSize: 15, fontWeight: 700, color: C.ink }}>{cliente.nome}</span>
+            <DonoBadge dono={cliente.dono} />
+          </div>
+          <div style={{ fontFamily: FONT_MONO, fontSize: 11.5, color: C.inkSoft, marginTop: 2 }}>{cliente.cpf || "sem CPF"}{cliente.processo ? ` · ${cliente.processo}` : ""}</div>
+        </div>
+        <span style={{ fontFamily: FONT_SANS, fontSize: 10.5, fontWeight: 700, color: C.brassDark, backgroundColor: C.brassSoft, padding: "3px 8px", borderRadius: 999 }}>Prestar contas</span>
+        <Icon name={expanded ? "chevronUp" : "chevronDown"} size={16} color={C.inkSoft} />
+      </button>
+      {expanded && draft && r && (
+        <div style={{ padding: "12px 14px 14px", borderTop: `1px dashed ${C.ruleSoft}` }}>
+          <span style={sectionLabelStyle}>1 · Identificação e contrato</span>
+          <ContratoFields especie={draft.especie} dataContrato={draft.dataContrato} contrato={draft.contrato}
+            onChange={(f, v) => upd({ [f]: v })} showToast={showToast} />
+
+          <span style={{ ...sectionLabelStyle, marginTop: 6 }}>2 · Despesas reembolsáveis</span>
+          {sub(res.despesas > 0 ? `O app descontou ${formatBRL(res.despesas)} do cliente como gastos reembolsáveis. Liste cada despesa com valor, data e comprovante (a soma precisa bater).` : "Este cliente não teve gastos reembolsáveis descontados. Não precisa listar despesas.")}
+          {draft.despesas.map((d, i) => (
+            <div key={d.key} style={{ padding: 10, marginBottom: 10, borderRadius: 9, backgroundColor: C.parchmentDark }}>
+              <Field label={`Despesa ${i + 1}`}><TextInput value={d.descricao} onChange={(e) => updDesp(d.key, { descricao: e.target.value })} placeholder="Custas, perícia, deslocamento, cópias..." /></Field>
+              <div style={gridTwo}>
+                <Field label="Data"><TextInput type="date" value={d.data} onChange={(e) => updDesp(d.key, { data: e.target.value })} /></Field>
+                <Field label="Valor"><MoneyInput value={d.valor} onChange={(e) => updDesp(d.key, { valor: e.target.value })} /></Field>
+              </div>
+              <AnexoPicker items={d.anexos} onChange={(v) => updDesp(d.key, { anexos: v })} showToast={showToast} texto="Anexar comprovante da despesa" />
+              <button type="button" onClick={() => setDraft((x) => ({ ...x, despesas: x.despesas.filter((y) => y.key !== d.key) }))} style={{ marginTop: 6, background: "none", border: "none", color: C.red, fontFamily: FONT_SANS, fontSize: 12, cursor: "pointer", padding: 0 }}>Remover esta despesa</button>
+            </div>
+          ))}
+          <button type="button" onClick={() => setDraft((x) => ({ ...x, despesas: [...x.despesas, { key: newId("dp"), descricao: "", data: "", valor: "", anexos: [] }] }))} style={miniBtn}><Icon name="plus" size={14} /> Adicionar despesa</button>
+
+          <span style={{ ...sectionLabelStyle, marginTop: 6 }}>3 · Outros descontos autorizados</span>
+          {sub("Só se o cliente autorizou algum desconto além dos honorários e das despesas. Normalmente fica em branco.")}
+          {draft.outros.map((o, i) => (
+            <div key={o.key} style={{ padding: 10, marginBottom: 10, borderRadius: 9, backgroundColor: C.parchmentDark }}>
+              <Field label={`Desconto ${i + 1}`}><TextInput value={o.descricao} onChange={(e) => updOut(o.key, { descricao: e.target.value })} placeholder="Descreva o desconto autorizado" /></Field>
+              <Field label="Valor"><MoneyInput value={o.valor} onChange={(e) => updOut(o.key, { valor: e.target.value })} /></Field>
+              <button type="button" onClick={() => setDraft((x) => ({ ...x, outros: x.outros.filter((y) => y.key !== o.key) }))} style={{ background: "none", border: "none", color: C.red, fontFamily: FONT_SANS, fontSize: 12, cursor: "pointer", padding: 0 }}>Remover</button>
+            </div>
+          ))}
+          <button type="button" onClick={() => setDraft((x) => ({ ...x, outros: [...x.outros, { key: newId("ou"), descricao: "", valor: "" }] }))} style={miniBtn}><Icon name="plus" size={14} /> Adicionar desconto</button>
+
+          <div style={{ padding: "10px 12px", borderRadius: 9, backgroundColor: C.brassSoft, border: `1px solid ${C.brass}`, marginBottom: 14 }}>
+            <span style={{ ...sectionLabelStyle, marginBottom: 6 }}>Resumo financeiro (calculado)</span>
+            {linhaRes(`Valor bruto levantado${res.levantamentoTexto ? " — " + res.levantamentoTexto : ""}`, res.bruto)}
+            {linhaRes("(–) Honorários — fase administrativa", res.administrativo)}
+            {linhaRes(`(–) Honorários — fase judicial (${res.pct})`, res.honorarios)}
+            {linhaRes("(–) Despesas reembolsáveis", res.despesas)}
+            {linhaRes("(–) Outros descontos", res.outros)}
+            {linhaRes("Líquido a repassar ao cliente", res.liquido, true)}
+          </div>
+
+          <span style={sectionLabelStyle}>4 · Repasse ao cliente</span>
+          <div style={gridTwo}>
+            <Field label="Data do repasse" required><TextInput type="date" value={draft.repasse.data} onChange={(e) => updRep({ data: e.target.value })} /></Field>
+            <Field label="Forma" required>
+              <select value={draft.repasse.forma} onChange={(e) => updRep({ forma: e.target.value })} style={{ ...inputBase, appearance: "none" }}>
+                {PC_FORMAS.map((f) => (<option key={f} value={f}>{f}</option>))}
+              </select>
+            </Field>
+          </div>
+          <Field label="Favorecido (nome e CPF)" required><TextInput value={draft.repasse.favorecido} onChange={(e) => updRep({ favorecido: e.target.value })} /></Field>
+          <Field label="Valor transferido ao cliente" required hint={`Líquido a repassar: ${formatBRL(res.liquido)}. Os dois valores precisam ser iguais (saldo remanescente zero).`}>
+            <MoneyInput value={draft.repasse.valor} onChange={(e) => updRep({ valor: e.target.value })} />
+          </Field>
+          {res.liquido > 0 && parseNum(draft.repasse.valor) !== res.liquido && (
+            <button type="button" onClick={() => updRep({ valor: String(res.liquido) })} style={{ marginTop: -8, marginBottom: 12, background: "none", border: "none", color: C.brassDark, fontFamily: FONT_SANS, fontSize: 12, fontWeight: 700, textDecoration: "underline", cursor: "pointer", padding: 0 }}>Preencher com o líquido ({formatBRL(res.liquido)})</button>
+          )}
+          <Field label="Comprovante da transferência (print, foto ou PDF)" required>
+            <AnexoPicker items={draft.repasse.anexos} onChange={(v) => updRep({ anexos: v })} showToast={showToast} texto="Anexar comprovante do repasse" />
+          </Field>
+
+          <span style={{ ...sectionLabelStyle, marginTop: 6 }}>5 · Declaração e ciência</span>
+          <div style={gridTwo}>
+            <Field label="Cidade/UF" required><TextInput value={draft.cidadeUf} onChange={(e) => upd({ cidadeUf: e.target.value })} /></Field>
+            <Field label="Data" required><TextInput type="date" value={draft.dataDecl} onChange={(e) => upd({ dataDecl: e.target.value })} /></Field>
+          </div>
+
+          <span style={{ ...sectionLabelStyle, marginTop: 6 }}>Comprovantes de levantamento</span>
+          {sub("Vêm da foto/PDF anexado em cada levantamento. Para incluir ou trocar, vá em Histórico → Levantamentos → Editar.")}
+          <div style={{ marginBottom: 14 }}>
+            {r.levsCliente.length === 0 && <span style={{ fontFamily: FONT_SANS, fontSize: 12.5, color: C.red }}>Nenhum levantamento do valor do cliente encontrado.</span>}
+            {r.levsCliente.map((l) => (
+              <div key={l.en.id} style={{ display: "flex", alignItems: "center", gap: 8, fontFamily: FONT_SANS, fontSize: 12.5, color: l.en.foto ? C.green : C.red, padding: "3px 0" }}>
+                <Icon name={l.en.foto ? "check" : "alert"} size={14} color={l.en.foto ? C.green : C.red} />
+                {formatDateBR(l.en.dataLevantamento)} · {BANCOS[l.en.banco] ? BANCOS[l.en.banco].short : l.en.banco} · {formatBRL(l.en.valorTotal)} — {l.en.foto ? "comprovante anexado" : "SEM comprovante"}
+              </div>
+            ))}
+          </div>
+
+          <div ref={errosRef}>{tentou && !r.ok && <PcErros r={r} />}</div>
+          <button type="button" onClick={gerar} disabled={busy} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: C.ink, color: "#fff", fontFamily: FONT_SANS, fontSize: 15, fontWeight: 700, padding: 14, borderRadius: 10, border: "none", cursor: busy ? "default" : "pointer", opacity: busy ? 0.7 : 1 }}>
+            {busy ? <Spinner size={17} /> : <Icon name="fileText" size={17} />} {busy ? "Gerando PDF..." : "Gerar prestação de contas"}
+          </button>
+          <div style={{ fontFamily: FONT_SANS, fontSize: 11, color: C.inkSoft, marginTop: 8, textAlign: "center" }}>Gera um único PDF: prestação + contrato + levantamento + despesas + repasse. Fica salvo em Histórico → Prestações.</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PrestacaoTab({ clientes, entries, prestacoes, drafts, setDrafts, onGerar, pcBusy, showToast }) {
+  const lista = clientes.filter((c) => situacaoCliente(c, entries, prestacoes).prestacaoPendente).sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+  if (lista.length === 0) {
+    return <EmptyState title="Nenhuma prestação de contas pendente" text="Quando um cliente tiver o levantamento lançado, ele aparece aqui até a prestação de contas ser gerada. As já geradas ficam em Histórico → Prestações." />;
+  }
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "10px 12px", borderRadius: 8, backgroundColor: C.parchmentDark, marginBottom: 14 }}>
+        <Icon name="info" size={13} color={C.inkSoft} />
+        <span style={{ fontFamily: FONT_SANS, fontSize: 11.5, color: C.inkSoft, lineHeight: 1.5 }}>Clientes já levantados que ainda não tiveram a prestação de contas gerada. O PDF só sai com todas as informações e documentos; se faltar algo, o app lista o que é.</span>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        {lista.map((c) => (
+          <PrestacaoCard key={c.id} cliente={c} entries={entries} draft={drafts[c.id]} showToast={showToast}
+            onOpen={() => setDrafts((d) => (d[c.id] ? d : { ...d, [c.id]: novoDraftPrestacao(c, entries) }))}
+            setDraft={(fn) => setDrafts((d) => ({ ...d, [c.id]: typeof fn === "function" ? fn(d[c.id] || novoDraftPrestacao(c, entries)) : fn }))}
+            onGerar={onGerar} busy={pcBusy === c.id} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function PrestacaoHistCard({ p, busy, onDownload, onRefazer }) {
+  const [confirm, setConfirm] = useState(false);
+  const rs = (p.dados && p.dados.resumo) || {};
+  return (
+    <div style={{ backgroundColor: C.card, border: `1px solid ${C.ruleSoft}`, borderLeft: `4px solid ${C.green}`, borderRadius: 10, padding: "12px 14px" }}>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontFamily: FONT_SERIF, fontSize: 15, fontWeight: 700, color: C.ink }}>{p.clienteNome}</div>
+          <div style={{ fontFamily: FONT_SANS, fontSize: 11.5, color: C.inkSoft, marginTop: 3 }}>Gerada em {fmtTs(p.geradoEm)}{p.geradoPor ? ` · ${p.geradoPor}` : ""}</div>
+          {p.dados && p.dados.repasse && <div style={{ fontFamily: FONT_SANS, fontSize: 11.5, color: C.inkSoft, marginTop: 2 }}>Repasse em {formatDateBR(p.dados.repasse.data)} · {p.dados.repasse.forma}</div>}
+        </div>
+        <div style={{ textAlign: "right", flexShrink: 0 }}>
+          <div style={{ fontFamily: FONT_SANS, fontSize: 10.5, color: C.inkSoft }}>Líquido ao cliente</div>
+          <div style={{ fontFamily: FONT_MONO, fontSize: 15, fontWeight: 700, color: C.ink }}>{formatBRL(rs.liquido != null ? rs.liquido : p.liquido)}</div>
+        </div>
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
+        <button onClick={onDownload} disabled={busy} style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 14px", borderRadius: 8, border: "none", backgroundColor: C.ink, color: "#fff", fontFamily: FONT_SANS, fontSize: 13, fontWeight: 700, cursor: busy ? "default" : "pointer", opacity: busy ? 0.7 : 1 }}>
+          {busy ? <Spinner size={14} /> : <Icon name="download" size={14} />} {busy ? "Montando PDF..." : "Baixar PDF completo"}
+        </button>
+        {!confirm ? (
+          <button onClick={() => setConfirm(true)} disabled={busy} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 12px", borderRadius: 8, border: `1.5px solid ${C.rule}`, backgroundColor: "#fff", color: C.ink, fontFamily: FONT_SANS, fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}><Icon name="pencil" size={13} /> Refazer</button>
+        ) : (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <span style={{ fontFamily: FONT_SANS, fontSize: 12, color: C.red }}>Apaga esta e reabre o formulário. Confirmar?</span>
+            <button onClick={() => { setConfirm(false); onRefazer(); }} style={{ background: C.red, color: "#fff", border: "none", borderRadius: 6, padding: "5px 10px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>Sim</button>
+            <button onClick={() => setConfirm(false)} style={{ background: "none", color: C.inkSoft, border: `1px solid ${C.rule}`, borderRadius: 6, padding: "5px 10px", fontSize: 12, cursor: "pointer" }}>Não</button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---------- Histórico Tab (tudo o que já saiu das outras abas fica aqui) ----------
+function HistoricoTab({ entries, clientes, prestacoes, pendentesCount, totalPendente, onEdit, onDelete, onGeneratePDF, pdfBusy, onEditCliente, onDeleteCliente, onDownloadPrestacao, onRefazerPrestacao, pcBusy }) {
+  const [view, setView] = useState("lev");
+  const [expandedId, setExpandedId] = useState(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const abas = [["lev", `Levantamentos (${entries.length})`], ["pc", `Prestações (${prestacoes.length})`], ["cli", `Clientes (${clientes.length})`]];
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
+        {abas.map(([k, lbl]) => (
+          <button key={k} onClick={() => setView(k)} style={{ flex: 1, padding: "9px 4px", borderRadius: 8, border: `1.5px solid ${view === k ? C.ink : C.rule}`, backgroundColor: view === k ? C.ink : "#fff", color: view === k ? "#fff" : C.ink, fontFamily: FONT_SANS, fontSize: 11.5, fontWeight: 700, cursor: "pointer" }}>{lbl}</button>
+        ))}
+      </div>
+
+      {view === "lev" && (entries.length === 0 ? (
+        <EmptyState title="Nenhum levantamento registrado" text="Toque em “Novo” para registrar o primeiro levantamento de RPV." />
+      ) : (
+        <div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16, padding: "10px 14px", borderRadius: 8, backgroundColor: C.card, border: `1px solid ${C.ruleSoft}` }}>
+            <span style={{ fontFamily: FONT_SANS, fontSize: 12.5, color: C.inkSoft }}>{entries.length} registro(s) · {pendentesCount} sem relatório</span>
+            <span style={{ fontFamily: FONT_MONO, fontSize: 13, fontWeight: 700, color: C.brassDark }}>{formatBRL(totalPendente)}</span>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {entries.map((en, i) => (
+              <EntryCard key={en.id} entry={en} index={entries.length - i} expanded={expandedId === en.id} onToggle={() => setExpandedId(expandedId === en.id ? null : en.id)}
+                onEdit={() => onEdit(en)} onGeneratePDF={() => onGeneratePDF(en)} pdfBusy={pdfBusy} confirmingDelete={confirmDeleteId === en.id}
+                onAskDelete={() => setConfirmDeleteId(en.id)} onCancelDelete={() => setConfirmDeleteId(null)}
+                onConfirmDelete={() => { onDelete(en.id); setConfirmDeleteId(null); }} />
+            ))}
+          </div>
+        </div>
+      ))}
+
+      {view === "pc" && (prestacoes.length === 0 ? (
+        <EmptyState title="Nenhuma prestação de contas gerada" text="As prestações geradas ficam aqui, com o PDF completo disponível para baixar de novo quando precisar." />
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {prestacoes.map((p) => (
+            <PrestacaoHistCard key={p.id} p={p} busy={pcBusy === p.id} onDownload={() => onDownloadPrestacao(p)} onRefazer={() => onRefazerPrestacao(p)} />
+          ))}
+        </div>
+      ))}
+
+      {view === "cli" && (clientes.length === 0 ? (
+        <EmptyState title="Nenhum cliente cadastrado" text="Cadastre clientes na aba “Clientes”." />
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {clientes.map((c) => (
+            <ClientCard key={c.id} cliente={c} entries={entries} prestacoes={prestacoes} onEdit={() => onEditCliente(c)} confirmingDelete={confirmDeleteId === c.id}
+              onAskDelete={() => setConfirmDeleteId(c.id)} onCancelDelete={() => setConfirmDeleteId(null)}
+              onConfirmDelete={() => { onDeleteCliente(c.id); setConfirmDeleteId(null); }} />
+          ))}
+        </div>
+      ))}
+    </div>
+  );
 }
 
 // ---------- Main App ----------
@@ -1992,6 +2791,9 @@ function RPVLedgerApp() {
   const [editingClienteId, setEditingClienteId] = useState(null);
   const [savingCliente, setSavingCliente] = useState(false);
   const [pdfBusy, setPdfBusy] = useState(false);
+  const [prestacoes, setPrestacoes] = useState([]);
+  const [pcDrafts, setPcDrafts] = useState({});
+  const [pcBusy, setPcBusy] = useState(null);
 
   useEffect(() => {
     const unsub = auth.onAuthStateChanged((u) => setUser(u || null));
@@ -2009,7 +2811,11 @@ function RPVLedgerApp() {
       (snap) => setClientes(snap.docs.map((d) => d.data())),
       () => {}
     );
-    return () => { unsubEntries(); unsubClientes(); };
+    const unsubPrest = db.collection("prestacoes").orderBy("geradoEm", "desc").onSnapshot(
+      (snap) => setPrestacoes(snap.docs.map((d) => d.data())),
+      () => {}
+    );
+    return () => { unsubEntries(); unsubClientes(); unsubPrest(); };
   }, [user]);
 
   function showToast(msg, type) {
@@ -2080,9 +2886,10 @@ function RPVLedgerApp() {
       const split = computeLevantamento({ cliente: linkedClient, vPrincipal: vP, vDestaque: vD, sucumbencial: form.sucumbencial, parceiroJaPago: parceiroJaPagoDe(entries, linkedClient.id, editingId) });
       valores = { valorEscritorio: split.escritorio, valorCliente: split.cliente, valorFlavio: split.flavio, valorBruno: split.bruno,
         valorParceiro: split.comissaoParceiro, parceiroNome: split.comissaoParceiro > 0 ? (linkedClient.parceiroNome || "").trim() : null,
-        administrativoPendente: split.administrativoPendente || 0, valorExcedenteCliente: split.excedenteCliente || 0 };
+        administrativoPendente: split.administrativoPendente || 0, valorExcedenteCliente: split.excedenteCliente || 0, det: detDeSplit(split, vP, vD, linkedClient) };
     } else {
-      valores = { valorEscritorio: parseNum(form.valorEscritorio), valorCliente: parseNum(form.valorCliente), valorFlavio: parseNum(form.valorFlavio), valorBruno: parseNum(form.valorBruno), valorParceiro: 0, parceiroNome: null, administrativoPendente: 0, valorExcedenteCliente: 0 };
+      valores = { valorEscritorio: parseNum(form.valorEscritorio), valorCliente: parseNum(form.valorCliente), valorFlavio: parseNum(form.valorFlavio), valorBruno: parseNum(form.valorBruno), valorParceiro: 0, parceiroNome: null, administrativoPendente: 0, valorExcedenteCliente: 0,
+        det: (baseEntry && baseEntry.det && Math.abs((baseEntry.valorTotal || 0) - totalLev) < 0.005 && Math.abs((baseEntry.valorCliente || 0) - parseNum(form.valorCliente)) < 0.005) ? baseEntry.det : null };
     }
 
     const entry = {
@@ -2116,13 +2923,13 @@ function RPVLedgerApp() {
     catch (err) { showToast("Erro ao excluir: " + err.message, "error"); }
   }
 
-  async function markAsSent(ids) {
+  async function markAsSent(ids, msg) {
     try {
       const batch = db.batch();
       const stamp = Date.now();
       ids.forEach((id) => batch.update(db.collection("levantamentos").doc(id), { enviado: true, enviadoEm: stamp }));
       await batch.commit();
-      showToast(`${ids.length} registro(s) marcado(s) como enviado(s).`);
+      showToast(typeof msg === "string" ? msg : `${ids.length} registro(s) marcado(s) como enviado(s).`);
     } catch (err) { showToast("Erro ao marcar como enviado: " + err.message, "error"); }
   }
 
@@ -2149,11 +2956,14 @@ function RPVLedgerApp() {
     try {
       const blob = buildBatchPdfBlob(list, totals, periodoLabel);
       const filename = `Relatorio-RPV-${todayISO()}.pdf`;
-      await sharePdfBlob(blob, filename, showToast);
+      const ok = await sharePdfBlob(blob, filename, showToast);
+      setPdfBusy(false);
+      return ok;
     } catch (err) {
       showToast("Erro ao gerar o PDF: " + err.message, "error");
     }
     setPdfBusy(false);
+    return false;
   }
 
   async function generateBackup() {
@@ -2163,6 +2973,8 @@ function RPVLedgerApp() {
         geradoEm: new Date().toISOString(),
         totalClientes: clientes.length,
         totalLevantamentos: entries.length,
+        totalPrestacoes: prestacoes.length,
+        prestacoes,
         clientes,
         levantamentos: entries,
       };
@@ -2174,6 +2986,55 @@ function RPVLedgerApp() {
       showToast("Erro ao gerar backup: " + err.message, "error");
     }
     setPdfBusy(false);
+  }
+
+  // ---- Prestação de contas
+  async function persistirDraft(draft, clienteId) {
+    const contrato = await guardarAnexos(draft.contrato, clienteId, "contrato");
+    const despesas = [];
+    for (const d of draft.despesas || []) despesas.push({ ...d, anexos: await guardarAnexos(d.anexos, clienteId, "despesa") });
+    const repasse = { ...draft.repasse, anexos: await guardarAnexos(draft.repasse.anexos, clienteId, "repasse") };
+    return { ...draft, contrato, despesas, repasse };
+  }
+  async function gerarPrestacao(cliente, draft) {
+    setPcBusy(cliente.id);
+    try {
+      const saved = await persistirDraft(draft, cliente.id);
+      const r = montarPrestacao({ cliente, entries, draft: saved });
+      if (!r.ok) { showToast("Há pendências na prestação de contas.", "error"); setPcBusy(null); return; }
+      const blob = await buildPrestacaoPdfBlob(r.dados, entries);
+      const id = newId("pc");
+      await db.collection("clientes").doc(cliente.id).set({
+        especieBeneficio: (saved.especie || "").trim(), dataContrato: saved.dataContrato || "",
+        contratoAnexos: saved.contrato.map((a) => ({ id: a.id, nome: a.nome, mime: a.mime })), editadoEm: Date.now(),
+      }, { merge: true });
+      await db.collection("prestacoes").doc(id).set({
+        id, clienteId: cliente.id, clienteNome: cliente.nome, geradoEm: Date.now(), geradoPor: user.email,
+        liquido: r.dados.resumo.liquido, dados: semDataUrl(r.dados), draft: semDataUrl(saved),
+      });
+      setPcDrafts((d) => { const n = { ...d }; delete n[cliente.id]; return n; });
+      showToast("Prestação de contas gerada. Ela fica em Histórico → Prestações.");
+      await shareFiles([{ blob, filename: nomeArquivoPrestacao(cliente.nome) }], showToast);
+    } catch (err) {
+      showToast("Erro ao gerar a prestação de contas: " + err.message, "error");
+    }
+    setPcBusy(null);
+  }
+  async function baixarPrestacao(p) {
+    setPcBusy(p.id);
+    try {
+      const blob = await buildPrestacaoPdfBlob(p.dados, entries);
+      await shareFiles([{ blob, filename: nomeArquivoPrestacao(p.clienteNome) }], showToast);
+    } catch (err) { showToast("Erro ao montar o PDF: " + err.message, "error"); }
+    setPcBusy(null);
+  }
+  async function refazerPrestacao(p) {
+    try {
+      await db.collection("prestacoes").doc(p.id).delete();
+      if (p.draft) setPcDrafts((d) => ({ ...d, [p.clienteId]: p.draft }));
+      setTab("prestacao");
+      showToast("Prestação apagada. Ajuste o que precisar e gere de novo.");
+    } catch (err) { showToast("Erro ao refazer: " + err.message, "error"); }
   }
 
   function resetClientForm() { setClientForm(EMPTY_CLIENT_FORM); setEditingClienteId(null); }
@@ -2193,6 +3054,8 @@ function RPVLedgerApp() {
       valorLiquido: cliente.temDestaque ? String(Math.max(0, (cliente.valorEstimado || 0) - (cliente.valorDestaque || 0))) : "",
       administrativoPago: !!cliente.administrativoPago,
       administrativoPagoValor: cliente.administrativoPagoValor ? String(cliente.administrativoPagoValor) : (cliente.administrativoPago && cliente.valorAdministrativo ? String(cliente.valorAdministrativo) : ""),
+      especieBeneficio: cliente.especieBeneficio || "", dataContrato: cliente.dataContrato || "",
+      contratoItens: (cliente.contratoAnexos || []).map((a) => ({ ...a })),
     });
   }
 
@@ -2208,7 +3071,15 @@ function RPVLedgerApp() {
     setSavingCliente(true);
     const id = editingClienteId || newId("cli");
     const base = editingClienteId ? clientes.find((c) => c.id === editingClienteId) : null;
+    let contratoAnexos = [];
+    try {
+      const salvos = await guardarAnexos(clientForm.contratoItens, id, "contrato");
+      contratoAnexos = salvos.map((a) => ({ id: a.id, nome: a.nome, mime: a.mime }));
+      const mantidos = new Set(contratoAnexos.map((a) => a.id));
+      for (const a of (base && base.contratoAnexos) || []) { if (!mantidos.has(a.id)) await db.collection("anexos").doc(a.id).delete(); }
+    } catch (err) { showToast("Erro ao salvar o contrato: " + err.message, "error"); setSavingCliente(false); return; }
     const cliente = {
+      ...(base || {}),
       id, dataCadastro: clientForm.dataCadastro || todayISO(), nome: clientForm.nome.trim().toLocaleUpperCase("pt-BR"), cpf: clientForm.cpf.trim(),
       numeroBeneficio: clientForm.numeroBeneficio.trim(), processo: clientForm.processo.trim(),
       valorEstimado: clientForm.temDestaque ? parseNum(clientForm.valorLiquido) + parseNum(clientForm.valorDestaque) : parseNum(clientForm.valorEstimado), dono: clientForm.dono, percentualExito: parseNum(clientForm.percentualExito),
@@ -2220,6 +3091,7 @@ function RPVLedgerApp() {
       temDestaque: !!clientForm.temDestaque, valorDestaque: clientForm.temDestaque ? parseNum(clientForm.valorDestaque) : 0,
       administrativoPago: !!clientForm.administrativoPago && parseNum(clientForm.valorAdministrativo) > 0,
       administrativoPagoValor: clientForm.administrativoPago ? Math.min(parseNum(clientForm.administrativoPagoValor) || parseNum(clientForm.valorAdministrativo), parseNum(clientForm.valorAdministrativo)) : 0,
+      especieBeneficio: clientForm.especieBeneficio.trim(), dataContrato: clientForm.dataContrato || "", contratoAnexos,
       criadoEm: base ? base.criadoEm : Date.now(), editadoEm: Date.now(),
     };
     try {
@@ -2240,6 +3112,9 @@ function RPVLedgerApp() {
   }
   if (user === null) return <LoginScreen />;
 
+  const clientesPend = clientes.filter((c) => situacaoCliente(c, entries, prestacoes).pendenteLancar);
+  const clientesOpcoes = clientes.filter((c) => c.id === form.clienteId || clientesPend.some((x) => x.id === c.id));
+  const prestPendentes = clientes.filter((c) => situacaoCliente(c, entries, prestacoes).prestacaoPendente).length;
   const pendentes = entries.filter((en) => !en.enviado);
   const totalPendente = pendentes.reduce((s, en) => s + (en.valorTotal || 0), 0);
 
@@ -2265,16 +3140,20 @@ function RPVLedgerApp() {
             <Spinner size={20} color={C.inkSoft} /><span style={{ marginLeft: 8, fontFamily: FONT_SANS, fontSize: 14 }}>Carregando registros...</span>
           </div>
         ) : tab === "clientes" ? (
-          <ClientesTab clientes={clientes} entries={entries} clientForm={clientForm} setClientForm={setClientForm} onSubmit={handleSubmitCliente}
+          <ClientesTab clientes={clientesPend} entries={entries} showToast={showToast} clientForm={clientForm} setClientForm={setClientForm} onSubmit={handleSubmitCliente}
             editingClienteId={editingClienteId} onCancelEdit={resetClientForm} onEdit={startEditCliente} onDelete={handleDeleteCliente} saving={savingCliente} />
         ) : tab === "novo" ? (
           <FormTab form={form} setForm={setForm} onSubmit={handleSubmit} editingId={editingId} onCancelEdit={resetForm}
             photoDataUrl={photoDataUrl} setPhotoDataUrl={setPhotoDataUrl} photoBusy={photoBusy} fileInputRef={fileInputRef} valorInputRef={valorInputRef}
             onPhotoFile={handlePhotoFile} responsaveisConhecidos={responsaveisConhecidos} clientes={clientes} entries={entries} saving={saving} showToast={showToast}
-            rateioManual={rateioManual} setRateioManual={setRateioManual} lastSaved={lastSaved} onNextEntry={nextEntry}
+            rateioManual={rateioManual} setRateioManual={setRateioManual} lastSaved={lastSaved} onNextEntry={nextEntry} clientesOpcoes={clientesOpcoes}
             onGeneratePDF={(entry) => generateSinglePDF(entry, photoDataUrl)} pdfBusy={pdfBusy} />
+        ) : tab === "prestacao" ? (
+          <PrestacaoTab clientes={clientes} entries={entries} prestacoes={prestacoes} drafts={pcDrafts} setDrafts={setPcDrafts} onGerar={gerarPrestacao} pcBusy={pcBusy} showToast={showToast} />
         ) : tab === "historico" ? (
-          <HistoricoTab entries={entries} pendentesCount={pendentes.length} totalPendente={totalPendente} onEdit={startEdit} onDelete={handleDelete} onGeneratePDF={(entry) => generateSinglePDF(entry)} pdfBusy={pdfBusy} />
+          <HistoricoTab entries={entries} clientes={clientes} prestacoes={prestacoes} pendentesCount={pendentes.length} totalPendente={totalPendente} onEdit={startEdit} onDelete={handleDelete} onGeneratePDF={(entry) => generateSinglePDF(entry)} pdfBusy={pdfBusy}
+            onEditCliente={(c) => { startEditCliente(c); setTab("clientes"); }} onDeleteCliente={handleDeleteCliente}
+            onDownloadPrestacao={baixarPrestacao} onRefazerPrestacao={refazerPrestacao} pcBusy={pcBusy} />
         ) : (
           <RelatorioTab entries={entries} clientes={clientes} onMarkSent={markAsSent} showToast={showToast} onGeneratePDF={generateBatchPDF} pdfBusy={pdfBusy} onBackup={generateBackup} />
         )}
@@ -2285,8 +3164,9 @@ function RPVLedgerApp() {
       <nav className="no-print" style={{ position: "fixed", bottom: 0, left: 0, right: 0, display: "flex", backgroundColor: "#fff", borderTop: `1.5px solid ${C.rule}`, boxShadow: "0 -4px 14px rgba(31,44,61,0.06)" }}>
         <NavButton active={tab === "clientes"} icon={<Icon name="users" size={18} />} label="Clientes" onClick={() => { if (tab !== "clientes") resetClientForm(); setTab("clientes"); }} />
         <NavButton active={tab === "novo"} icon={<Icon name="plus" size={19} />} label="Novo" onClick={() => { if (tab !== "novo") resetForm(); setTab("novo"); }} />
-        <NavButton active={tab === "historico"} icon={<Icon name="clipboard" size={19} />} label="Histórico" badge={pendentes.length > 0 ? pendentes.length : null} onClick={() => setTab("historico")} />
-        <NavButton active={tab === "relatorio"} icon={<Icon name="send" size={18} />} label="Relatório" onClick={() => setTab("relatorio")} />
+        <NavButton active={tab === "prestacao"} icon={<Icon name="fileText" size={19} />} label="Prestação" badge={prestPendentes > 0 ? prestPendentes : null} onClick={() => setTab("prestacao")} />
+        <NavButton active={tab === "historico"} icon={<Icon name="clipboard" size={19} />} label="Histórico" onClick={() => setTab("historico")} />
+        <NavButton active={tab === "relatorio"} icon={<Icon name="send" size={18} />} label="Relatório" badge={pendentes.length > 0 ? pendentes.length : null} onClick={() => setTab("relatorio")} />
       </nav>
     </div>
   );
