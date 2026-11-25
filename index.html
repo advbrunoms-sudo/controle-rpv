@@ -54,7 +54,7 @@
   // Pegue esses valores em: console.firebase.google.com > seu projeto >
   // ⚙️ Configurações do projeto > seus apps > SDK setup and configuration
   // ------------------------------------------------------------------
-  window.__FIREBASE_CONFIG__ = {
+    window.__FIREBASE_CONFIG__ = {
     apiKey: "AIzaSyAWcwHAFLTLQ1fW2G94hAfuD4zN34ecQ2A",
   authDomain: "controlerpv-9a502.firebaseapp.com",
   projectId: "controlerpv-9a502",
@@ -215,23 +215,40 @@ const BANCOS = {
 };
 const DONOS = { Bruno: { label: "Dr. Bruno" }, "Flávio": { label: "Dr. Flávio" } };
 
-function computeSplit({ valorTotal, percentualExito, dono, sucumbencial, valorAdministrativo, valorGastos }) {
+// modo: "completo" (padrão: saque único do valor total, honorários calculados pelo % de êxito),
+//       "destaque" (saque do destaque de honorários feito pelo juízo: o valor levantado É o honorário),
+//       "principal" (saque do RPV/Precatório já sem o destaque: só administrativo, gastos e cliente).
+// totalRequisicao: valor total da requisição (usado só no modo destaque, p/ limitar o divisível a 30% dele).
+// parceiroJaPago: comissão fixa já paga em levantamentos anteriores do mesmo cliente.
+function computeSplit({ valorTotal, percentualExito, dono, sucumbencial, valorAdministrativo, valorGastos, parceiroTipo, parceiroValor, modo, totalRequisicao, parceiroJaPago }) {
   const total = Number(valorTotal) || 0;
   const donoIsBruno = dono === "Bruno";
+  const m = modo || "completo";
   if (sucumbencial) {
-    return { escritorio: 0, cliente: 0, flavio: donoIsBruno ? 0 : total, bruno: donoIsBruno ? total : 0, honorarioTotal: total, baseDivisivel: 0, excedente: total, administrativoAplicado: 0, gastosAplicado: 0 };
+    return { escritorio: 0, cliente: 0, flavio: donoIsBruno ? 0 : total, bruno: donoIsBruno ? total : 0, honorarioTotal: total, baseDivisivel: 0, excedente: total, administrativoAplicado: 0, gastosAplicado: 0, comissaoParceiro: 0, baseComissao: 0 };
   }
   const pct = (Number(percentualExito) || 0) / 100;
-  const honorarioTotal = total * pct;
-  const baseDivisivel = Math.min(honorarioTotal, total * 0.3);
-  const excedente = Math.max(0, honorarioTotal - baseDivisivel);
+  let honorarioTotal, baseDivisivel, excedente;
+  if (m === "principal") {
+    honorarioTotal = 0; baseDivisivel = 0; excedente = 0;
+  } else if (m === "destaque") {
+    honorarioTotal = total;
+    const ref = Number(totalRequisicao) || 0;
+    const teto = ref > 0 ? ref * 0.3 : (pct > 0 ? (total / pct) * 0.3 : total);
+    baseDivisivel = Math.min(honorarioTotal, teto);
+    excedente = Math.max(0, honorarioTotal - baseDivisivel);
+  } else {
+    honorarioTotal = total * pct;
+    baseDivisivel = Math.min(honorarioTotal, total * 0.3);
+    excedente = Math.max(0, honorarioTotal - baseDivisivel);
+  }
   let escritorio = baseDivisivel * 0.4;
   let donoShare = baseDivisivel * 0.5 + excedente;
   const outroShare = baseDivisivel * 0.1;
 
   // Valor administrativo: sai do que sobraria para o cliente e vai integralmente
   // para o escritório (cliente do Bruno) ou para o Dr. Flávio (cliente dele).
-  let restante = Math.max(0, total - honorarioTotal);
+  let restante = m === "destaque" ? 0 : m === "principal" ? total : Math.max(0, total - honorarioTotal);
   const administrativoAplicado = Math.min(Math.max(0, Number(valorAdministrativo) || 0), restante);
   if (donoIsBruno) escritorio += administrativoAplicado;
   else donoShare += administrativoAplicado;
@@ -245,23 +262,242 @@ function computeSplit({ valorTotal, percentualExito, dono, sucumbencial, valorAd
   restante -= gastosAplicado;
 
   const clienteValor = restante;
+
+  // Comissão de parceiro(a): sai SEMPRE da parte do escritório, nunca do cliente.
+  // Base do percentual = receita do escritório em honorários (40% do divisível + administrativo
+  // quando o cliente é do Dr. Bruno), SEM os gastos reembolsáveis (que são só devolução).
+  // Valor fixo: deduz o valor informado, descontando o que já foi pago em levantamentos anteriores.
+  const baseComissao = Math.max(0, escritorio - gastosAplicado);
+  let pv = Math.max(0, Number(parceiroValor) || 0);
+  if (parceiroTipo === "fixo") pv = Math.max(0, pv - Math.max(0, Number(parceiroJaPago) || 0));
+  let comissaoParceiro = 0;
+  if (pv > 0) {
+    comissaoParceiro = parceiroTipo === "fixo" ? pv : baseComissao * (pv / 100);
+    comissaoParceiro = Math.min(comissaoParceiro, escritorio);
+  }
+  escritorio -= comissaoParceiro;
   return {
-    escritorio, cliente: clienteValor,
+    escritorio, cliente: clienteValor, comissaoParceiro, baseComissao,
     flavio: donoIsBruno ? outroShare : donoShare,
     bruno: donoIsBruno ? donoShare : outroShare,
     honorarioTotal, baseDivisivel, excedente, administrativoAplicado, gastosAplicado,
   };
+}
+
+// Cálculo de um levantamento. Se o cliente tem destaque de honorários, o saque pode ter duas partes
+// independentes: o principal (RPV/Precatório já sem o destaque) e o destaque. Cada uma é calculada
+// no seu modo e o resultado é somado.
+const SPLIT_KEYS = ["escritorio", "cliente", "flavio", "bruno", "comissaoParceiro", "baseComissao", "honorarioTotal", "baseDivisivel", "excedente", "administrativoAplicado", "gastosAplicado"];
+function computeLevantamento({ cliente, vPrincipal, vDestaque, sucumbencial, parceiroJaPago }) {
+  const base = {
+    percentualExito: cliente.percentualExito, dono: cliente.dono, sucumbencial: !!sucumbencial,
+    valorAdministrativo: cliente.valorAdministrativo, valorGastos: cliente.gastosReembolsaveis,
+    parceiroTipo: cliente.parceiroTipo, parceiroValor: cliente.parceiroNome ? cliente.parceiroValor : 0,
+  };
+  const vp = Number(vPrincipal) || 0, vd = Number(vDestaque) || 0;
+  const jaPago = Number(parceiroJaPago) || 0;
+  if (!cliente.temDestaque || sucumbencial) {
+    return computeSplit({ ...base, valorTotal: vp + vd, modo: "completo", parceiroJaPago: jaPago });
+  }
+  const d = computeSplit({ ...base, valorTotal: vd, modo: "destaque", totalRequisicao: cliente.valorEstimado, parceiroJaPago: jaPago });
+  const p = computeSplit({ ...base, valorTotal: vp, modo: "principal", parceiroJaPago: jaPago + d.comissaoParceiro });
+  const out = {};
+  SPLIT_KEYS.forEach((k) => { out[k] = (d[k] || 0) + (p[k] || 0); });
+  out.partes = { principal: p, destaque: d };
+  return out;
+}
+
+// Quanto da comissão fixa do parceiro já foi paga em outros levantamentos do mesmo cliente.
+function parceiroJaPagoDe(entries, clienteId, ignorarId) {
+  if (!clienteId) return 0;
+  return entries.filter((e) => e.clienteId === clienteId && e.id !== ignorarId).reduce((a, e) => a + (e.valorParceiro || 0), 0);
+}
+
+// O que já foi levantado de cada parte da requisição de um cliente.
+function statusLevantamento(cliente, entries) {
+  const meus = entries.filter((e) => e.clienteId === cliente.id && !e.sucumbencial);
+  let principal = 0, destaque = 0, qtd = 0;
+  meus.forEach((e) => {
+    qtd++;
+    if (e.tipoLevantamento && e.tipoLevantamento !== "completo") { principal += e.valorPrincipal || 0; destaque += e.valorDestaque || 0; }
+    else principal += e.valorTotal || 0;
+  });
+  return { principal, destaque, qtd, principalFeito: principal > 0, destaqueFeito: destaque > 0 };
+}
+function reqLabel(tipo) { return tipo === "Precatório" ? "Precatório" : tipo === "RPV" ? "RPV" : "RPV/Precatório"; }
+function tipoLevLabel(en) {
+  const r = reqLabel(en.tipoRequisicao);
+  if (en.tipoLevantamento === "destaque") return "Somente destaque de honorários";
+  if (en.tipoLevantamento === "principal") return `Somente ${r} (principal)`;
+  if (en.tipoLevantamento === "ambos") return `${r} + destaque de honorários`;
+  return null;
+}
+function tipoLevCurto(en) {
+  if (en.tipoLevantamento === "destaque") return "Destaque";
+  if (en.tipoLevantamento === "principal") return "Principal";
+  if (en.tipoLevantamento === "ambos") return "Principal + destaque";
+  return reqLabel(en.tipoRequisicao);
+}
+// Texto de pendência: quando só uma parte foi levantada e a outra ainda não consta em nenhum lançamento.
+function pendenciaTexto(entry, cliente, entries) {
+  if (!cliente || !cliente.temDestaque || entry.sucumbencial) return "";
+  if (entry.tipoLevantamento !== "principal" && entry.tipoLevantamento !== "destaque") return "";
+  const st = statusLevantamento(cliente, entries);
+  const r = reqLabel(cliente.tipoRequisicao);
+  if (entry.tipoLevantamento === "principal" && !st.destaqueFeito) return `destaque de honorários${cliente.valorDestaque > 0 ? ` (previsto ${formatBRL(cliente.valorDestaque)})` : ""} ainda não levantado`;
+  if (entry.tipoLevantamento === "destaque" && !st.principalFeito) {
+    const liq = Math.max(0, (cliente.valorEstimado || 0) - (cliente.valorDestaque || 0));
+    return `${r} (principal${liq > 0 ? `, previsto ${formatBRL(liq)}` : ""}) ainda não levantado`;
+  }
+  return "";
 }
 function administrativoDestino(dono) { return dono === "Flávio" ? "Dr. Flávio (integral)" : "Escritório (integral)"; }
 
 const EMPTY_FORM = {
   clienteId: "", cliente: "", processo: "", banco: "CEF", dataLevantamento: todayISO(), responsavel: "",
   valorTotal: "", valorEscritorio: "", valorCliente: "", valorFlavio: "", valorBruno: "", sucumbencial: false, obs: "",
+  valorPrincipal: "", valorDestaque: "",
 };
 const EMPTY_CLIENT_FORM = {
   dataCadastro: todayISO(), nome: "", cpf: "", numeroBeneficio: "", processo: "", valorEstimado: "",
   dono: "Bruno", percentualExito: "30", valorAdministrativo: "", gastosReembolsaveis: "", temSucumbencia: false, valorSucumbencial: "", obs: "",
+  parceiroNome: "", parceiroTipo: "percentual", parceiroValor: "",
+  tipoRequisicao: "RPV", numeroRequisicao: "", temDestaque: false, valorDestaque: "",
 };
+
+// ---------- Leitura do PDF do RPV / Precatório ----------
+// 1) carrega o pdf.js só quando o botão é usado; 2) junta o texto por linhas; 3) procura os campos por rótulo.
+function loadPdfJs() {
+  if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+  if (loadPdfJs._p) return loadPdfJs._p;
+  loadPdfJs._p = new Promise((resolve, reject) => {
+    const sc = document.createElement("script");
+    sc.src = "https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.min.js";
+    sc.onload = () => {
+      if (!window.pdfjsLib) { loadPdfJs._p = null; return reject(new Error("pdf.js não carregou")); }
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = "https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js";
+      resolve(window.pdfjsLib);
+    };
+    sc.onerror = () => { loadPdfJs._p = null; reject(new Error("Sem internet para carregar o leitor de PDF")); };
+    document.head.appendChild(sc);
+  });
+  return loadPdfJs._p;
+}
+async function readPdfText(file) {
+  const pdfjs = await loadPdfJs();
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjs.getDocument({ data: buf }).promise;
+  const pages = [];
+  for (let n = 1; n <= pdf.numPages; n++) {
+    const page = await pdf.getPage(n);
+    const content = await page.getTextContent();
+    pages.push(textItemsToLines(content.items));
+  }
+  return pages.join("\n");
+}
+// Agrupa os pedaços de texto do PDF em linhas (mesma altura = mesma linha, da esquerda para a direita).
+function textItemsToLines(items) {
+  const rows = [];
+  items.forEach((it) => {
+    if (!it.str || !it.str.trim()) return;
+    const y = Math.round(it.transform[5]);
+    const x = it.transform[4];
+    let row = rows.find((r) => Math.abs(r.y - y) <= 2);
+    if (!row) { row = { y, parts: [] }; rows.push(row); }
+    row.parts.push({ x, str: it.str });
+  });
+  rows.sort((a, b) => b.y - a.y);
+  return rows.map((r) => r.parts.sort((a, b) => a.x - b.x).map((p) => p.str).join(" ").replace(/\s+/g, " ").trim()).join("\n");
+}
+
+const RE_CNJ = /\d{7}-\d{2}\.\d{4}\.\d\.\d{2}\.\d{4}/;
+const RE_CPF = /\d{3}\.\d{3}\.\d{3}-\d{2}/;
+const RE_MONEY = /(?:R\$\s*)?(\d{1,3}(?:\.\d{3})*,\d{2})/;
+function moneyToNumber(str) { return parseFloat(String(str).replace(/\./g, "").replace(",", ".")); }
+
+// Procura um valor em dinheiro logo depois de um dos rótulos (na mesma linha ou na linha seguinte).
+function moneyAfterLabel(text, labels) {
+  for (const lab of labels) {
+    const re = new RegExp(lab.source + "[^\\d\\n]{0,80}?(?:R\\$\\s*)?(\\d{1,3}(?:\\.\\d{3})*,\\d{2})", "i");
+    let m = text.match(re);
+    if (m) return moneyToNumber(m[m.length - 1]);
+    const re2 = new RegExp(lab.source + "[^\\n]{0,80}\\n[^\\d\\n]{0,40}(?:R\\$\\s*)?(\\d{1,3}(?:\\.\\d{3})*,\\d{2})", "i");
+    m = text.match(re2);
+    if (m) return moneyToNumber(m[m.length - 1]);
+  }
+  return null;
+}
+function cleanName(raw) {
+  if (!raw) return "";
+  let n = raw.split(/CPF|CNPJ|\d|\||R\$|Advogad|OAB|Nascimento|Data /i)[0];
+  n = n.replace(/[:\-–]+$/g, "").replace(/\s+/g, " ").trim();
+  return n.length >= 5 && n.split(" ").length >= 2 ? n : "";
+}
+function titleCaseName(n) {
+  if (n !== n.toUpperCase()) return n;
+  return n.toLowerCase().replace(/(^|\s)([a-zà-ú])/g, (m, a, b) => a + b.toUpperCase()).replace(/\b(Da|De|Do|Das|Dos|E)\b/g, (w) => w.toLowerCase());
+}
+
+function extractRequisicao(textRaw) {
+  const text = String(textRaw || "").replace(/ /g, " ").replace(/[ \t]+/g, " ");
+  const fields = {}; const found = [];
+  function put(key, value, label) { if (value !== undefined && value !== null && value !== "" && !(typeof value === "number" && isNaN(value))) { fields[key] = value; found.push(label); } }
+
+  // Tipo (RPV x Precatório): vence o termo que aparece primeiro no documento.
+  const iRpv = text.search(/requisi[çc][ãa]o de pequeno valor|\bRPV\b/i);
+  const iPrec = text.search(/precat[óo]rio/i);
+  if (iRpv >= 0 || iPrec >= 0) {
+    const tipo = iRpv >= 0 && (iPrec < 0 || iRpv < iPrec) ? "RPV" : "Precatório";
+    put("tipoRequisicao", tipo, "Tipo (" + tipo + ")");
+  }
+
+  // Processo (CNJ): prefere o que vem depois de "Processo", senão o primeiro do documento.
+  let proc = null;
+  const mProc = text.match(new RegExp("Processo[^\\d\\n]{0,40}(" + RE_CNJ.source + ")", "i"));
+  if (mProc) proc = mProc[1]; else { const m = text.match(RE_CNJ); if (m) proc = m[0]; }
+  put("processo", proc, "Nº do processo");
+
+  // Nº da requisição / ofício requisitório.
+  const mReq = text.match(/(?:Requisi[çc][ãa]o|Of[ií]cio Requisit[óo]rio|Precat[óo]rio|RPV)\s*(?:N[ºo°.]*|n[úu]mero)\s*[:\-]?\s*([\dA-Za-z][\d./-]{5,})/i)
+    || text.match(/N[úu]mero d[ao] (?:Requisi[çc][ãa]o|RPV|Precat[óo]rio)\s*[:\-]?\s*([\dA-Za-z][\d./-]{5,})/i);
+  if (mReq && mReq[1] !== proc) put("numeroRequisicao", mReq[1].replace(/[.\-/]+$/, ""), "Nº da requisição");
+
+  // Beneficiário (nome + CPF).
+  const reNome = /(?:Benefici[áa]rio(?:\(a\))?|Requerente|Credor(?:\(a\))?|Exequente|Parte Autora|Autor(?:\(a\))?)\s*[:\-]?\s*([^\n]*)(?:\n([^\n]*))?/gi;
+  let nome = "", posNome = -1, mm;
+  while ((mm = reNome.exec(text)) !== null) {
+    nome = cleanName(mm[1]) || cleanName(mm[2]);
+    if (nome) { posNome = mm.index; break; }
+  }
+  if (nome) put("nome", titleCaseName(nome), "Nome do beneficiário");
+  let cpf = null;
+  if (posNome >= 0) { const m = text.slice(posNome, posNome + 400).match(RE_CPF); if (m) cpf = m[0]; }
+  if (!cpf) {
+    const all = text.match(new RegExp(RE_CPF.source, "g")) || [];
+    if (all.length === 1) cpf = all[0];
+  }
+  put("cpf", cpf, "CPF");
+
+  // Valores.
+  const total = moneyAfterLabel(text, [
+    /Valor total (?:da |do )?(?:requisi[çc][ãa]o|requisitado|a ser pago|do precat[óo]rio|da RPV|geral)/,
+    /Total (?:requisitado|da requisi[çc][ãa]o)/, /Valor (?:global|requisitado)/, /Valor total/,
+  ]);
+  put("valorEstimado", total, "Valor total da requisição");
+
+  const destaque = moneyAfterLabel(text, [
+    /Honor[áa]rios (?:advocat[íi]cios )?contratuais(?: destacados)?/, /Destaque (?:de |dos |do )?(?:valor de )?honor[áa]rios(?: contratuais| advocat[íi]cios)?/,
+    /Valor destacado/, /Honor[áa]rios destacados/,
+  ]);
+  if (destaque && destaque > 0) { put("valorDestaque", destaque, "Destaque de honorários"); fields.temDestaque = true; }
+
+  const suc = moneyAfterLabel(text, [/Honor[áa]rios (?:advocat[íi]cios )?(?:de )?sucumb[êe]ncia(?:is)?/, /Sucumb[êe]ncia/]);
+  if (suc && suc > 0) { put("valorSucumbencial", suc, "Honorários sucumbenciais"); fields.temSucumbencia = true; }
+
+  const banco = /Caixa Econ[ôo]mica/i.test(text) ? "CEF" : /Banco do Brasil/i.test(text) ? "BB" : null;
+  if (banco) fields.bancoDepositario = banco;
+  return { fields, found };
+}
 
 // ---------- Small UI atoms ----------
 function LogoMark({ size = 40 }) {
@@ -421,9 +657,14 @@ function LoginScreen() {
 }
 
 // ---------- Fee breakdown preview ----------
-function FeeBreakdown({ dono, percentualExito, valorEstimado, valorAdministrativo, valorGastos }) {
+function FeeBreakdown({ dono, percentualExito, valorEstimado, valorAdministrativo, valorGastos, parceiroNome, parceiroTipo, parceiroValor, temDestaque, valorDestaque }) {
   const valor = parseNum(valorEstimado);
-  const split = computeSplit({ valorTotal: valor, percentualExito, dono, sucumbencial: false, valorAdministrativo, valorGastos });
+  const temParceiro = !!(parceiroNome && String(parceiroNome).trim());
+  const destaqueNum = temDestaque ? Math.min(parseNum(valorDestaque), valor) : 0;
+  const comDestaque = destaqueNum > 0;
+  const split = comDestaque
+    ? computeLevantamento({ cliente: { percentualExito, dono, valorAdministrativo, gastosReembolsaveis: valorGastos, parceiroTipo, parceiroNome: temParceiro ? parceiroNome : "", parceiroValor, temDestaque: true, valorDestaque: destaqueNum, valorEstimado: valor }, vPrincipal: valor - destaqueNum, vDestaque: destaqueNum, sucumbencial: false, parceiroJaPago: 0 })
+    : computeSplit({ valorTotal: valor, percentualExito, dono, sucumbencial: false, valorAdministrativo, valorGastos, parceiroTipo, parceiroValor: temParceiro ? parceiroValor : 0 });
   const donoLabel = dono === "Flávio" ? "Dr. Flávio" : "Dr. Bruno";
   const outroLabel = dono === "Flávio" ? "Dr. Bruno" : "Dr. Flávio";
   const donoTotal = dono === "Flávio" ? split.flavio : split.bruno;
@@ -437,15 +678,18 @@ function FeeBreakdown({ dono, percentualExito, valorEstimado, valorAdministrativ
       </div>
       {valor > 0 ? (
         <React.Fragment>
-          <BreakdownRow label={`Honorário total (${formatPct(percentualExito)} de ${formatBRL(valor)})`} value={split.honorarioTotal} />
+          {comDestaque
+            ? <BreakdownRow label="Honorário destacado pelo juízo (levantado à parte)" value={split.honorarioTotal} />
+            : <BreakdownRow label={`Honorário total (${formatPct(percentualExito)} de ${formatBRL(valor)})`} value={split.honorarioTotal} />}
           <BreakdownRow label="Base divisível (até 30% do valor)" value={split.baseDivisivel} />
           {split.excedente > 0 && <BreakdownRow label={`Excedente — 100% ${donoLabel}`} value={split.excedente} highlight />}
           <div style={{ height: 1, backgroundColor: "rgba(241,230,200,0.2)", margin: "8px 0" }} />
-          <BreakdownRow label="Escritório (40% do divisível)" value={split.escritorio} bold />
+          <BreakdownRow label={split.comissaoParceiro > 0 ? "Escritório (líquido, após comissão)" : "Escritório (40% do divisível)"} value={split.escritorio} bold />
+          {split.comissaoParceiro > 0 && <BreakdownRow label={`Parceiro(a) ${String(parceiroNome).trim()} — sai do escritório`} value={split.comissaoParceiro} highlight />}
           <BreakdownRow label={`${donoLabel}, dono do cliente (50% + excedente)`} value={donoTotal} bold />
           <BreakdownRow label={`${outroLabel}, outro sócio (10% do divisível)`} value={outroTotal} bold />
           <BreakdownRow label="Cliente recebe" value={split.cliente} />
-          {(split.administrativoAplicado > 0 || split.gastosAplicado > 0) && (
+          {(split.administrativoAplicado > 0 || split.gastosAplicado > 0 || split.comissaoParceiro > 0) && (
             <div style={{ marginTop: 6 }}>
               {split.administrativoAplicado > 0 && (
                 <div style={{ fontFamily: FONT_SANS, fontSize: 11.5, color: "#B7C2CE", lineHeight: 1.5 }}>
@@ -455,6 +699,11 @@ function FeeBreakdown({ dono, percentualExito, valorEstimado, valorAdministrativ
               {split.gastosAplicado > 0 && (
                 <div style={{ fontFamily: FONT_SANS, fontSize: 11.5, color: "#B7C2CE", lineHeight: 1.5, marginTop: split.administrativoAplicado > 0 ? 4 : 0 }}>
                   Já inclui {formatBRL(split.gastosAplicado)} de gastos reembolsáveis, descontados do cliente e somados ao escritório acima.
+                </div>
+              )}
+              {split.comissaoParceiro > 0 && (
+                <div style={{ fontFamily: FONT_SANS, fontSize: 11.5, color: "#B7C2CE", lineHeight: 1.5, marginTop: (split.administrativoAplicado > 0 || split.gastosAplicado > 0) ? 4 : 0 }}>
+                  Comissão de {formatBRL(split.comissaoParceiro)} ({parceiroTipo === "fixo" ? "valor fixo" : `${formatPct(parceiroValor)} de ${formatBRL(split.baseComissao)}`}) descontada somente do escritório.
                 </div>
               )}
             </div>
@@ -498,9 +747,47 @@ function BreakdownRow({ label, value, bold, highlight }) {
 }
 
 // ---------- Clientes Tab ----------
-function ClientesTab({ clientes, clientForm, setClientForm, onSubmit, editingClienteId, onCancelEdit, onEdit, onDelete, saving }) {
+function ClientesTab({ clientes, entries, clientForm, setClientForm, onSubmit, editingClienteId, onCancelEdit, onEdit, onDelete, saving }) {
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const [leitura, setLeitura] = useState(null); // { busy, erro, found, texto, vazio }
+  const [verTexto, setVerTexto] = useState(false);
+  const pdfInputRef = useRef(null);
   function set(field, value) { setClientForm((f) => ({ ...f, [field]: value })); }
+
+  async function onPdfRequisicao(e) {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = "";
+    if (!file) return;
+    setVerTexto(false);
+    setLeitura({ busy: true });
+    try {
+      const texto = await readPdfText(file);
+      if (texto.replace(/\s/g, "").length < 40) {
+        setLeitura({ erro: "Este PDF não tem texto selecionável (parece ser uma imagem digitalizada). Preencha os dados manualmente.", texto });
+        return;
+      }
+      const { fields, found } = extractRequisicao(texto);
+      if (found.length === 0) {
+        setLeitura({ erro: "Li o PDF, mas não reconheci os campos. Preencha manualmente.", texto });
+        return;
+      }
+      setClientForm((f) => {
+        const n = { ...f };
+        if (fields.nome) n.nome = fields.nome;
+        if (fields.cpf) n.cpf = fields.cpf;
+        if (fields.processo) n.processo = fields.processo;
+        if (fields.tipoRequisicao) n.tipoRequisicao = fields.tipoRequisicao;
+        if (fields.numeroRequisicao) n.numeroRequisicao = fields.numeroRequisicao;
+        if (fields.valorEstimado != null) n.valorEstimado = String(fields.valorEstimado);
+        if (fields.temDestaque) { n.temDestaque = true; n.valorDestaque = String(fields.valorDestaque); }
+        if (fields.temSucumbencia) { n.temSucumbencia = true; n.valorSucumbencial = String(fields.valorSucumbencial); }
+        return n;
+      });
+      setLeitura({ found, texto, banco: fields.bancoDepositario || null });
+    } catch (err) {
+      setLeitura({ erro: "Não consegui ler o PDF: " + err.message + ". Preencha manualmente." });
+    }
+  }
 
   return (
     <div>
@@ -513,6 +800,64 @@ function ClientesTab({ clientes, clientForm, setClientForm, onSubmit, editingCli
         )}
 
         <div style={cardStyle}>
+          <span style={sectionLabelStyle}>RPV / Precatório</span>
+          <input type="file" accept="application/pdf" ref={pdfInputRef} onChange={onPdfRequisicao} style={{ display: "none" }} />
+          <button type="button" onClick={() => pdfInputRef.current && pdfInputRef.current.click()} disabled={leitura && leitura.busy} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: 14, borderRadius: 10, border: `2px dashed ${C.brass}`, backgroundColor: C.brassSoft, color: C.brassDark, fontFamily: FONT_SANS, fontSize: 14, fontWeight: 700, cursor: "pointer", marginBottom: 10 }}>
+            {leitura && leitura.busy ? <Spinner size={16} color={C.brassDark} /> : <Icon name="clipboard" size={17} />}
+            {leitura && leitura.busy ? "Lendo o PDF..." : "Ler o PDF do RPV / Precatório"}
+          </button>
+          {leitura && !leitura.busy && (
+            <div style={{ marginBottom: 12, padding: "10px 12px", borderRadius: 8, backgroundColor: leitura.erro ? C.redSoft : C.greenSoft, border: `1px solid ${leitura.erro ? C.red : C.green}` }}>
+              {leitura.erro ? (
+                <span style={{ fontFamily: FONT_SANS, fontSize: 12.5, color: C.red }}>{leitura.erro}</span>
+              ) : (
+                <div style={{ fontFamily: FONT_SANS, fontSize: 12.5, color: C.green, lineHeight: 1.5 }}>
+                  <strong>Dados lidos do PDF e preenchidos abaixo:</strong> {leitura.found.join(", ")}.<br />
+                  <span style={{ color: C.ink }}>Confira tudo antes de salvar. O que não veio no PDF (dono do cliente, percentual, administrativo, gastos, parceiro) é preenchido por você.</span>
+                </div>
+              )}
+              {leitura.texto && (
+                <button type="button" onClick={() => setVerTexto((v) => !v)} style={{ marginTop: 6, background: "none", border: "none", padding: 0, fontFamily: FONT_SANS, fontSize: 11.5, fontWeight: 700, color: C.inkSoft, textDecoration: "underline", cursor: "pointer" }}>{verTexto ? "Esconder texto lido" : "Ver texto lido do PDF"}</button>
+              )}
+              {verTexto && leitura.texto && (
+                <pre style={{ marginTop: 6, maxHeight: 180, overflow: "auto", fontFamily: FONT_MONO, fontSize: 10.5, color: C.ink, whiteSpace: "pre-wrap", wordBreak: "break-word", backgroundColor: "#fff", borderRadius: 6, padding: 8 }}>{leitura.texto}</pre>
+              )}
+            </div>
+          )}
+          <Field label="Tipo da requisição">
+            <div style={{ display: "flex", gap: 8 }}>
+              {["RPV", "Precatório"].map((t) => (
+                <button type="button" key={t} onClick={() => set("tipoRequisicao", t)} style={{ flex: 1, padding: "10px 0", borderRadius: 8, border: `1.5px solid ${clientForm.tipoRequisicao === t ? C.ink : C.rule}`, backgroundColor: clientForm.tipoRequisicao === t ? C.ink : "#fff", color: clientForm.tipoRequisicao === t ? "#fff" : C.ink, fontFamily: FONT_SANS, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>{t}</button>
+              ))}
+            </div>
+          </Field>
+          <Field label="Nº da requisição"><TextInput value={clientForm.numeroRequisicao} onChange={(e) => set("numeroRequisicao", e.target.value)} placeholder="Número do ofício / requisição" style={{ fontFamily: FONT_MONO, fontSize: 13 }} /></Field>
+          <Field label="Valor total da requisição (RPV / precatório expedido)" hint={clientForm.temDestaque ? "Valor total, já incluindo o destaque de honorários" : undefined}><MoneyInput value={clientForm.valorEstimado} onChange={(e) => set("valorEstimado", e.target.value)} /></Field>
+
+          <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, cursor: "pointer" }}>
+            <input type="checkbox" checked={clientForm.temDestaque} onChange={(e) => set("temDestaque", e.target.checked)} style={{ width: 16, height: 16, accentColor: C.brass }} />
+            <span style={{ fontFamily: FONT_SANS, fontSize: 13, color: C.ink, fontWeight: 600 }}>Destaque de honorários advocatícios</span>
+          </label>
+          {clientForm.temDestaque && (
+            <div style={{ marginTop: 8, padding: 12, borderRadius: 9, backgroundColor: C.parchmentDark }}>
+              <Field label="Valor do destaque (honorários contratuais)" required>
+                <MoneyInput value={clientForm.valorDestaque} onChange={(e) => set("valorDestaque", e.target.value)} />
+              </Field>
+              {parseNum(clientForm.valorEstimado) > 0 && parseNum(clientForm.valorDestaque) > 0 && (
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 8, fontFamily: FONT_SANS, fontSize: 12.5, color: C.inkSoft, marginBottom: 8 }}>
+                  <span>RPV/Precatório sem o destaque (principal)</span>
+                  <strong style={{ color: C.ink, fontFamily: FONT_MONO }}>{formatBRL(Math.max(0, parseNum(clientForm.valorEstimado) - parseNum(clientForm.valorDestaque)))}</strong>
+                </div>
+              )}
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+                <Icon name="info" size={13} color={C.inkSoft} />
+                <span style={{ fontFamily: FONT_SANS, fontSize: 11.5, color: C.inkSoft }}>Com destaque, o honorário é o valor destacado pelo juízo. No levantamento você lança o principal e o destaque separadamente, cada um no dia em que for sacado.</span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div style={cardStyle}>
           <span style={sectionLabelStyle}>Dados do cliente</span>
           <div style={gridTwo}>
             <Field label="Data de cadastro"><TextInput type="date" value={clientForm.dataCadastro} onChange={(e) => set("dataCadastro", e.target.value)} /></Field>
@@ -523,7 +868,6 @@ function ClientesTab({ clientes, clientForm, setClientForm, onSubmit, editingCli
             <Field label="Número do benefício (NB)"><TextInput value={clientForm.numeroBeneficio} onChange={(e) => set("numeroBeneficio", e.target.value)} placeholder="000.000.000-0" style={{ fontFamily: FONT_MONO, fontSize: 14 }} /></Field>
             <Field label="Nº do processo"><TextInput value={clientForm.processo} onChange={(e) => set("processo", e.target.value)} placeholder="0000000-00.0000..." style={{ fontFamily: FONT_MONO, fontSize: 13 }} /></Field>
           </div>
-          <Field label="Valor do RPV / precatório expedido"><MoneyInput value={clientForm.valorEstimado} onChange={(e) => set("valorEstimado", e.target.value)} /></Field>
           <Field label="Dono do cliente" required>
             <div style={{ display: "flex", gap: 8 }}>
               {Object.keys(DONOS).map((key) => (
@@ -572,8 +916,42 @@ function ClientesTab({ clientes, clientForm, setClientForm, onSubmit, editingCli
           )}
         </div>
 
+        <div style={cardStyle}>
+          <span style={sectionLabelStyle}>Parceiro(a) — comissão</span>
+          <Field label="Nome do(a) parceiro(a) que trouxe o cliente" hint="Deixe em branco se o cliente não veio de parceiro">
+            <TextInput value={clientForm.parceiroNome} onChange={(e) => set("parceiroNome", e.target.value)} placeholder="Nome do(a) parceiro(a)" />
+          </Field>
+          {clientForm.parceiroNome.trim() !== "" && (
+            <React.Fragment>
+              <Field label="Tipo da comissão">
+                <div style={{ display: "flex", gap: 8 }}>
+                  {[["percentual", "Percentual (%)"], ["fixo", "Valor fixo (R$)"]].map(([key, lbl]) => (
+                    <button type="button" key={key} onClick={() => set("parceiroTipo", key)} style={{ flex: 1, padding: "10px 0", borderRadius: 8, border: `1.5px solid ${clientForm.parceiroTipo === key ? C.ink : C.rule}`, backgroundColor: clientForm.parceiroTipo === key ? C.ink : "#fff", color: clientForm.parceiroTipo === key ? "#fff" : C.ink, fontFamily: FONT_SANS, fontSize: 13.5, fontWeight: 700, cursor: "pointer" }}>
+                      {lbl}
+                    </button>
+                  ))}
+                </div>
+              </Field>
+              <Field label={clientForm.parceiroTipo === "fixo" ? "Valor da comissão" : "Percentual da comissão"} hint={clientForm.parceiroTipo === "fixo" ? "Valor em reais, descontado da parte do escritório" : "Costuma ser 10% — calculado sobre a parte do escritório (sem os gastos reembolsáveis)"}>
+                {clientForm.parceiroTipo === "fixo" ? (
+                  <MoneyInput value={clientForm.parceiroValor} onChange={(e) => set("parceiroValor", e.target.value)} />
+                ) : (
+                  <div style={{ position: "relative" }}>
+                    <input type="number" inputMode="decimal" step="0.5" min="0" max="100" value={clientForm.parceiroValor} onChange={(e) => set("parceiroValor", e.target.value)} placeholder="10" style={{ ...inputBase, paddingRight: 30, fontFamily: FONT_MONO }} />
+                    <span style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", color: C.inkSoft, fontSize: 14, fontWeight: 600 }}>%</span>
+                  </div>
+                )}
+              </Field>
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "8px 12px", borderRadius: 8, backgroundColor: C.parchmentDark }}>
+                <Icon name="info" size={13} color={C.inkSoft} />
+                <span style={{ fontFamily: FONT_SANS, fontSize: 11.5, color: C.inkSoft }}>A comissão sai do valor do escritório. O cliente e os sócios não são afetados.</span>
+              </div>
+            </React.Fragment>
+          )}
+        </div>
+
         <div style={{ marginBottom: 14 }}>
-          <FeeBreakdown dono={clientForm.dono} percentualExito={clientForm.percentualExito} valorEstimado={clientForm.valorEstimado} valorAdministrativo={clientForm.valorAdministrativo} valorGastos={clientForm.gastosReembolsaveis} />
+          <FeeBreakdown dono={clientForm.dono} percentualExito={clientForm.percentualExito} valorEstimado={clientForm.valorEstimado} valorAdministrativo={clientForm.valorAdministrativo} valorGastos={clientForm.gastosReembolsaveis} parceiroNome={clientForm.parceiroNome} parceiroTipo={clientForm.parceiroTipo} parceiroValor={clientForm.parceiroValor} temDestaque={clientForm.temDestaque} valorDestaque={clientForm.valorDestaque} />
         </div>
 
         {clientForm.temSucumbencia && (
@@ -603,7 +981,7 @@ function ClientesTab({ clientes, clientForm, setClientForm, onSubmit, editingCli
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 16 }}>
           {clientes.map((c) => (
-            <ClientCard key={c.id} cliente={c} onEdit={() => onEdit(c)} confirmingDelete={confirmDeleteId === c.id}
+            <ClientCard key={c.id} cliente={c} entries={entries} onEdit={() => onEdit(c)} confirmingDelete={confirmDeleteId === c.id}
               onAskDelete={() => setConfirmDeleteId(c.id)} onCancelDelete={() => setConfirmDeleteId(null)}
               onConfirmDelete={() => { onDelete(c.id); setConfirmDeleteId(null); }} />
           ))}
@@ -613,7 +991,7 @@ function ClientesTab({ clientes, clientForm, setClientForm, onSubmit, editingCli
   );
 }
 
-function ClientCard({ cliente, onEdit, confirmingDelete, onAskDelete, onCancelDelete, onConfirmDelete }) {
+function ClientCard({ cliente, entries, onEdit, confirmingDelete, onAskDelete, onCancelDelete, onConfirmDelete }) {
   const [expanded, setExpanded] = useState(false);
   return (
     <div style={{ backgroundColor: C.card, border: `1px solid ${C.ruleSoft}`, borderLeft: `4px solid ${cliente.dono === "Flávio" ? C.blue : C.brass}`, borderRadius: 10, overflow: "hidden" }}>
@@ -635,11 +1013,25 @@ function ClientCard({ cliente, onEdit, confirmingDelete, onAskDelete, onCancelDe
         <div style={{ padding: "0 14px 14px", borderTop: `1px dashed ${C.ruleSoft}` }}>
           {cliente.numeroBeneficio && <div style={{ marginTop: 12, fontFamily: FONT_SANS, fontSize: 12.5, color: C.inkSoft }}>NB: <strong style={{ color: C.ink }}>{cliente.numeroBeneficio}</strong></div>}
           {cliente.processo && <div style={{ marginTop: 4, fontFamily: FONT_SANS, fontSize: 12.5, color: C.inkSoft }}>Processo: <strong style={{ color: C.ink, fontFamily: FONT_MONO }}>{cliente.processo}</strong></div>}
+          <div style={{ marginTop: 12, fontFamily: FONT_SANS, fontSize: 12.5, color: C.inkSoft }}>{reqLabel(cliente.tipoRequisicao)}{cliente.numeroRequisicao ? <span> nº <strong style={{ color: C.ink, fontFamily: FONT_MONO }}>{cliente.numeroRequisicao}</strong></span> : null}</div>
+          {cliente.temDestaque && cliente.valorDestaque > 0 && <div style={{ marginTop: 4, fontFamily: FONT_SANS, fontSize: 12.5, color: C.inkSoft }}>Destaque de honorários: <strong style={{ color: C.ink }}>{formatBRL(cliente.valorDestaque)}</strong> · principal sem destaque: <strong style={{ color: C.ink }}>{formatBRL(Math.max(0, (cliente.valorEstimado || 0) - cliente.valorDestaque))}</strong></div>}
+          {(() => {
+            const st = statusLevantamento(cliente, entries || []);
+            const chip = (ok, txt) => <span style={{ fontFamily: FONT_SANS, fontSize: 11, fontWeight: 700, padding: "3px 8px", borderRadius: 999, backgroundColor: ok ? C.greenSoft : C.parchmentDark, color: ok ? C.green : C.inkSoft, border: `1px solid ${ok ? C.green : C.rule}` }}>{txt}</span>;
+            return (
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
+                {cliente.temDestaque
+                  ? [chip(st.principalFeito, st.principalFeito ? `${reqLabel(cliente.tipoRequisicao)} levantado` : `${reqLabel(cliente.tipoRequisicao)} pendente`), chip(st.destaqueFeito, st.destaqueFeito ? "Destaque levantado" : "Destaque pendente")]
+                  : chip(st.principalFeito, st.principalFeito ? "Levantado" : "Aguardando levantamento")}
+              </div>
+            );
+          })()}
           {cliente.valorAdministrativo > 0 && <div style={{ marginTop: 4, fontFamily: FONT_SANS, fontSize: 12.5, color: C.inkSoft }}>Administrativo: <strong style={{ color: C.ink }}>{formatBRL(cliente.valorAdministrativo)}</strong> · {administrativoDestino(cliente.dono)}</div>}
           {cliente.gastosReembolsaveis > 0 && <div style={{ marginTop: 4, fontFamily: FONT_SANS, fontSize: 12.5, color: C.inkSoft }}>Gastos reembolsáveis: <strong style={{ color: C.ink }}>{formatBRL(cliente.gastosReembolsaveis)}</strong> · voltam para o escritório</div>}
+          {cliente.parceiroNome && <div style={{ marginTop: 4, fontFamily: FONT_SANS, fontSize: 12.5, color: C.inkSoft }}>Parceiro(a): <strong style={{ color: C.ink }}>{cliente.parceiroNome}</strong>{cliente.parceiroValor > 0 && <span> · comissão {cliente.parceiroTipo === "fixo" ? formatBRL(cliente.parceiroValor) : formatPct(cliente.parceiroValor)} (sai do escritório)</span>}</div>}
           {cliente.obs && <div style={{ marginTop: 4, fontFamily: FONT_SANS, fontSize: 12.5, color: C.inkSoft, fontStyle: "italic" }}>“{cliente.obs}”</div>}
           <div style={{ marginTop: 12 }}>
-            <FeeBreakdown dono={cliente.dono} percentualExito={cliente.percentualExito} valorEstimado={cliente.valorEstimado} valorAdministrativo={cliente.valorAdministrativo} valorGastos={cliente.gastosReembolsaveis} />
+            <FeeBreakdown dono={cliente.dono} percentualExito={cliente.percentualExito} valorEstimado={cliente.valorEstimado} valorAdministrativo={cliente.valorAdministrativo} valorGastos={cliente.gastosReembolsaveis} parceiroNome={cliente.parceiroNome} parceiroTipo={cliente.parceiroTipo} parceiroValor={cliente.parceiroValor} temDestaque={cliente.temDestaque} valorDestaque={cliente.valorDestaque} />
           </div>
           {cliente.temSucumbencia && (
             <div style={{ marginTop: 10 }}>
@@ -669,11 +1061,17 @@ function AutoRateioPreview({ split }) {
   return (
     <div style={{ backgroundColor: C.parchmentDark, borderRadius: 9, padding: "12px 14px" }}>
       <div style={gridTwo}>
-        <LedgerValue label="Escritório" value={split.escritorio} />
+        <LedgerValue label={split.comissaoParceiro > 0 ? "Escritório (líquido)" : "Escritório"} value={split.escritorio} />
         <LedgerValue label="Cliente" value={split.cliente} />
         <LedgerValue label="Dr. Flávio" value={split.flavio} />
         <LedgerValue label="Dr. Bruno" value={split.bruno} />
+        {split.comissaoParceiro > 0 && <LedgerValue label="Parceiro(a)" value={split.comissaoParceiro} />}
       </div>
+      {split.comissaoParceiro > 0 && (
+        <div style={{ fontFamily: FONT_SANS, fontSize: 11, color: C.inkSoft, marginTop: 8 }}>
+          Comissão de parceiro(a) já descontada da parte do escritório (não afeta o cliente).
+        </div>
+      )}
       {split.administrativoAplicado > 0 && (
         <div style={{ fontFamily: FONT_SANS, fontSize: 11, color: C.inkSoft, marginTop: 8 }}>
           Inclui {formatBRL(split.administrativoAplicado)} de valor administrativo, descontado do cliente.
@@ -689,14 +1087,19 @@ function AutoRateioPreview({ split }) {
 }
 
 // ---------- Novo / Editar Levantamento Tab ----------
-function FormTab({ form, setForm, onSubmit, editingId, onCancelEdit, photoDataUrl, setPhotoDataUrl, photoBusy, fileInputRef, valorInputRef, onPhotoFile, responsaveisConhecidos, clientes, saving, showToast, rateioManual, setRateioManual, lastSaved, onNextEntry, onGeneratePDF, pdfBusy }) {
+function FormTab({ form, setForm, onSubmit, editingId, onCancelEdit, photoDataUrl, setPhotoDataUrl, photoBusy, fileInputRef, valorInputRef, onPhotoFile, responsaveisConhecidos, clientes, entries, saving, showToast, rateioManual, setRateioManual, lastSaved, onNextEntry, onGeneratePDF, pdfBusy }) {
   const [showDetails, setShowDetails] = useState(false);
   function set(field, value) { setForm((f) => ({ ...f, [field]: value })); }
   const linkedClient = clientes.find((c) => c.id === form.clienteId) || null;
-  const autoSplit = linkedClient && !rateioManual ? computeSplit({ valorTotal: parseNum(form.valorTotal), percentualExito: linkedClient.percentualExito, dono: linkedClient.dono, sucumbencial: form.sucumbencial, valorAdministrativo: linkedClient.valorAdministrativo, valorGastos: linkedClient.gastosReembolsaveis }) : null;
+  const usaDestaque = !!(linkedClient && linkedClient.temDestaque);
+  const vP = usaDestaque ? parseNum(form.valorPrincipal) : parseNum(form.valorTotal);
+  const vD = usaDestaque ? parseNum(form.valorDestaque) : 0;
+  const totalLev = vP + vD;
+  const stCliente = usaDestaque ? statusLevantamento(linkedClient, (entries || []).filter((en) => en.id !== editingId)) : null;
+  const autoSplit = linkedClient && !rateioManual ? computeLevantamento({ cliente: linkedClient, vPrincipal: vP, vDestaque: vD, sucumbencial: form.sucumbencial, parceiroJaPago: parceiroJaPagoDe(entries || [], linkedClient.id, editingId) }) : null;
   const somaManual = parseNum(form.valorEscritorio) + parseNum(form.valorCliente) + parseNum(form.valorFlavio) + parseNum(form.valorBruno);
-  const diffManual = Math.round((parseNum(form.valorTotal) - somaManual) * 100) / 100;
-  const showDiffWarning = !autoSplit && form.valorTotal && Math.abs(diffManual) > 0.01;
+  const diffManual = Math.round((totalLev - somaManual) * 100) / 100;
+  const showDiffWarning = !autoSplit && totalLev > 0 && Math.abs(diffManual) > 0.01;
 
   if (lastSaved) {
     return (
@@ -713,6 +1116,7 @@ function FormTab({ form, setForm, onSubmit, editingId, onCancelEdit, photoDataUr
               <BankBadge banco={lastSaved.banco} />
             </div>
             <div style={{ fontFamily: FONT_MONO, fontSize: 11.5, color: C.inkSoft }}>Proc. {lastSaved.processo}</div>
+            {tipoLevLabel(lastSaved) && <div style={{ fontFamily: FONT_SANS, fontSize: 12, fontWeight: 700, color: C.brassDark, marginTop: 6 }}>{tipoLevLabel(lastSaved)}</div>}
             <div style={{ fontFamily: FONT_MONO, fontSize: 20, fontWeight: 700, color: C.ink, marginTop: 6 }}>{formatBRL(lastSaved.valorTotal)}</div>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 8, width: "100%", marginTop: 16 }}>
@@ -789,8 +1193,28 @@ function FormTab({ form, setForm, onSubmit, editingId, onCancelEdit, photoDataUr
       </div>
 
       <div style={cardStyle}>
-        <span style={sectionLabelStyle}>Valor levantado</span>
-        <MoneyInput big inputRef={valorInputRef} value={form.valorTotal} onChange={(e) => set("valorTotal", e.target.value)} />
+        <span style={sectionLabelStyle}>{usaDestaque ? "Valores levantados" : "Valor levantado"}</span>
+        {usaDestaque ? (
+          <React.Fragment>
+            <div style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "8px 12px", borderRadius: 8, backgroundColor: C.parchmentDark, marginBottom: 12 }}>
+              <Icon name="info" size={13} color={C.inkSoft} />
+              <span style={{ fontFamily: FONT_SANS, fontSize: 11.5, color: C.inkSoft }}>Este cliente tem destaque de honorários. Lance só o que foi sacado hoje: o {reqLabel(linkedClient.tipoRequisicao)}, o destaque, ou os dois. Deixe em branco a parte que não foi sacada.</span>
+            </div>
+            <Field label={`${reqLabel(linkedClient.tipoRequisicao)} (principal, sem o destaque)`} hint={`Previsto: ${formatBRL(Math.max(0, (linkedClient.valorEstimado || 0) - (linkedClient.valorDestaque || 0)))}${stCliente && stCliente.principalFeito ? ` · já levantado: ${formatBRL(stCliente.principal)}` : ""}`}>
+              <MoneyInput big inputRef={valorInputRef} value={form.valorPrincipal} onChange={(e) => set("valorPrincipal", e.target.value)} />
+            </Field>
+            <Field label="Destaque de honorários advocatícios" hint={`Previsto: ${formatBRL(linkedClient.valorDestaque || 0)}${stCliente && stCliente.destaqueFeito ? ` · já levantado: ${formatBRL(stCliente.destaque)}` : ""}`}>
+              <MoneyInput big value={form.valorDestaque} onChange={(e) => set("valorDestaque", e.target.value)} />
+            </Field>
+            {totalLev > 0 && (
+              <div style={{ fontFamily: FONT_SANS, fontSize: 12.5, color: C.inkSoft, marginBottom: 4 }}>
+                Levantamento: <strong style={{ color: C.ink }}>{vP > 0 && vD > 0 ? `${reqLabel(linkedClient.tipoRequisicao)} + destaque de honorários` : vD > 0 ? "somente destaque de honorários" : `somente ${reqLabel(linkedClient.tipoRequisicao)}`}</strong> · total {formatBRL(totalLev)}
+              </div>
+            )}
+          </React.Fragment>
+        ) : (
+          <MoneyInput big inputRef={valorInputRef} value={form.valorTotal} onChange={(e) => set("valorTotal", e.target.value)} />
+        )}
         <div style={{ marginTop: 12 }}>
           <Field label="Responsável pelo levantamento" required>
             <TextInput list="responsaveis-list" value={form.responsavel} onChange={(e) => set("responsavel", e.target.value)} placeholder="Quem foi ao banco" />
@@ -843,7 +1267,7 @@ function FormTab({ form, setForm, onSubmit, editingId, onCancelEdit, photoDataUr
           )}
         </div>
         {autoSplit ? (
-          form.valorTotal ? <AutoRateioPreview split={autoSplit} /> : <span style={{ fontFamily: FONT_SANS, fontSize: 12.5, color: C.inkSoft }}>Informe o valor levantado para calcular o rateio.</span>
+          totalLev > 0 ? <AutoRateioPreview split={autoSplit} /> : <span style={{ fontFamily: FONT_SANS, fontSize: 12.5, color: C.inkSoft }}>Informe o valor levantado para calcular o rateio.</span>
         ) : (
           <React.Fragment>
             <div style={gridTwo}>
@@ -852,7 +1276,7 @@ function FormTab({ form, setForm, onSubmit, editingId, onCancelEdit, photoDataUr
               <Field label="Dr. Flávio"><MoneyInput value={form.valorFlavio} onChange={(e) => set("valorFlavio", e.target.value)} /></Field>
               <Field label="Dr. Bruno (honorários)"><MoneyInput value={form.valorBruno} onChange={(e) => set("valorBruno", e.target.value)} /></Field>
             </div>
-            {form.valorTotal && (
+            {totalLev > 0 && (
               <div style={{ marginTop: 4, padding: "8px 12px", borderRadius: 8, display: "flex", alignItems: "flex-start", gap: 8, backgroundColor: showDiffWarning ? C.redSoft : C.greenSoft, border: `1px solid ${showDiffWarning ? C.red : C.green}` }}>
                 <Icon name={showDiffWarning ? "alert" : "check"} size={15} color={showDiffWarning ? C.red : C.green} />
                 <span style={{ fontFamily: FONT_SANS, fontSize: 12.5, color: showDiffWarning ? C.red : C.green }}>
@@ -918,6 +1342,7 @@ function EntryCard({ entry, index, expanded, onToggle, onEdit, onGeneratePDF, pd
             <span style={{ fontFamily: FONT_SERIF, fontSize: 15, fontWeight: 700, color: C.ink }}>{entry.cliente}</span>
             <BankBadge banco={entry.banco} />
             {entry.sucumbencial && <span style={{ fontFamily: FONT_SANS, fontSize: 10, fontWeight: 700, color: C.blue, backgroundColor: C.blueSoft, padding: "2px 6px", borderRadius: 4, textTransform: "uppercase", letterSpacing: "0.03em" }}>Sucumbência</span>}
+            {tipoLevLabel(entry) && <span style={{ fontFamily: FONT_SANS, fontSize: 10, fontWeight: 700, color: C.brassDark, backgroundColor: C.brassSoft, padding: "2px 6px", borderRadius: 4, textTransform: "uppercase", letterSpacing: "0.03em" }}>{tipoLevCurto(entry)}</span>}
           </div>
           <div style={{ fontFamily: FONT_MONO, fontSize: 11.5, color: C.inkSoft, marginTop: 2 }}>Proc. {entry.processo}</div>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
@@ -933,11 +1358,19 @@ function EntryCard({ entry, index, expanded, onToggle, onEdit, onGeneratePDF, pd
       {expanded && (
         <div style={{ padding: "0 14px 14px", borderTop: `1px dashed ${C.ruleSoft}` }}>
           <div style={{ ...gridTwo, marginTop: 12 }}>
-            <LedgerValue label="Escritório" value={entry.valorEscritorio} />
+            <LedgerValue label={entry.valorParceiro > 0 ? "Escritório (líquido)" : "Escritório"} value={entry.valorEscritorio} />
             <LedgerValue label="Cliente" value={entry.valorCliente} />
             <LedgerValue label="Dr. Flávio" value={entry.valorFlavio} />
             <LedgerValue label="Dr. Bruno" value={entry.valorBruno} />
+            {entry.valorParceiro > 0 && <LedgerValue label={`Parceiro(a)${entry.parceiroNome ? " — " + entry.parceiroNome : ""}`} value={entry.valorParceiro} />}
           </div>
+          {tipoLevLabel(entry) && (
+            <div style={{ marginTop: 10, fontFamily: FONT_SANS, fontSize: 12.5, color: C.inkSoft }}>
+              Levantamento: <strong style={{ color: C.ink }}>{tipoLevLabel(entry)}</strong>
+              {entry.valorPrincipal > 0 && <span> · {reqLabel(entry.tipoRequisicao)}: {formatBRL(entry.valorPrincipal)}</span>}
+              {entry.valorDestaque > 0 && <span> · Destaque: {formatBRL(entry.valorDestaque)}</span>}
+            </div>
+          )}
           <div style={{ marginTop: 10, fontFamily: FONT_SANS, fontSize: 12.5, color: C.inkSoft }}>Responsável pelo levantamento: <strong style={{ color: C.ink }}>{entry.responsavel}</strong></div>
           {entry.obs && <div style={{ marginTop: 4, fontFamily: FONT_SANS, fontSize: 12.5, color: C.inkSoft, fontStyle: "italic" }}>“{entry.obs}”</div>}
           {entry.foto && (
@@ -982,7 +1415,7 @@ function LedgerValue({ label, value }) {
 }
 
 // ---------- Relatório Tab ----------
-function RelatorioTab({ entries, onMarkSent, showToast, onGeneratePDF, pdfBusy }) {
+function RelatorioTab({ entries, clientes, onMarkSent, showToast, onGeneratePDF, pdfBusy, onBackup }) {
   const [dataInicio, setDataInicio] = useState("");
   const [dataFim, setDataFim] = useState("");
   const [apenasPendentes, setApenasPendentes] = useState(true);
@@ -999,27 +1432,36 @@ function RelatorioTab({ entries, onMarkSent, showToast, onGeneratePDF, pdfBusy }
   useEffect(() => { setSelecionados(new Set(filtrados.map((en) => en.id))); }, [dataInicio, dataFim, apenasPendentes, entries.length]);
 
   const lista = filtrados.filter((en) => selecionados.has(en.id));
+  const listaP = lista.map((en) => ({ ...en, _pend: pendenciaTexto(en, (clientes || []).find((c) => c.id === en.clienteId) || null, entries) }));
   const totals = lista.reduce((acc, en) => {
+    if (en.tipoLevantamento && en.tipoLevantamento !== "completo") { acc.principal += en.valorPrincipal || 0; acc.destaque += en.valorDestaque || 0; }
+    else acc.principal += en.valorTotal || 0;
     acc.total += en.valorTotal || 0; acc.escritorio += en.valorEscritorio || 0; acc.cliente += en.valorCliente || 0;
-    acc.flavio += en.valorFlavio || 0; acc.bruno += en.valorBruno || 0; return acc;
-  }, { total: 0, escritorio: 0, cliente: 0, flavio: 0, bruno: 0 });
+    acc.flavio += en.valorFlavio || 0; acc.bruno += en.valorBruno || 0; acc.parceiro += en.valorParceiro || 0; return acc;
+  }, { total: 0, escritorio: 0, cliente: 0, flavio: 0, bruno: 0, parceiro: 0, principal: 0, destaque: 0 });
 
   const periodoLabel = dataInicio || dataFim ? `${dataInicio ? formatDateBR(dataInicio) : "início"} a ${dataFim ? formatDateBR(dataFim) : "hoje"}` : "todos os registros";
 
   function reportText() {
-    const linhas = lista.map((en, i) => (
+    const linhas = listaP.map((en, i) => (
       `${i + 1}. ${en.cliente} — Proc. ${en.processo}${en.sucumbencial ? " (honorários sucumbenciais)" : ""}\n` +
       `   Banco: ${BANCOS[en.banco] ? BANCOS[en.banco].short : en.banco} | Data: ${formatDateBR(en.dataLevantamento)} | Responsável: ${en.responsavel}\n` +
+      (tipoLevLabel(en) ? `   Levantamento: ${tipoLevLabel(en)}${en.valorPrincipal > 0 ? ` | ${reqLabel(en.tipoRequisicao)}: ${formatBRL(en.valorPrincipal)}` : ""}${en.valorDestaque > 0 ? ` | Destaque de honorários: ${formatBRL(en.valorDestaque)}` : ""}\n` : "") +
       `   Valor total: ${formatBRL(en.valorTotal)}\n` +
       `   Escritório: ${formatBRL(en.valorEscritorio)} | Cliente: ${formatBRL(en.valorCliente)} | Dr. Flávio: ${formatBRL(en.valorFlavio)} | Dr. Bruno (honorários): ${formatBRL(en.valorBruno)}` +
+      (en.valorParceiro > 0 ? `\n   Parceiro(a)${en.parceiroNome ? " " + en.parceiroNome : ""}: ${formatBRL(en.valorParceiro)} (já descontado do escritório)` : "") +
+      (en._pend ? `\n   ATENÇÃO — pendente: ${en._pend}` : "") +
       (en.obs ? `\n   Obs: ${en.obs}` : "")
     )).join("\n\n");
     return (
       `RELATÓRIO DE LEVANTAMENTO DE RPV — REZENDE MAIA ADVOCACIA\n` +
       `Gerado em ${formatDateBR(todayISO())} · Período: ${periodoLabel}\n` +
       `${lista.length} levantamento(s)\n\n${linhas || "(nenhum registro selecionado)"}\n\n————————————————————\nTOTAIS\n` +
-      `Valor total levantado: ${formatBRL(totals.total)}\nEscritório: ${formatBRL(totals.escritorio)}\nCliente: ${formatBRL(totals.cliente)}\n` +
-      `Dr. Flávio: ${formatBRL(totals.flavio)}\nDr. Bruno (honorários): ${formatBRL(totals.bruno)}`
+      `Valor total levantado: ${formatBRL(totals.total)}\n` +
+      (totals.destaque > 0 ? `   • RPV/Precatório (principal): ${formatBRL(totals.principal)}\n   • Destaque de honorários: ${formatBRL(totals.destaque)}\n` : "") +
+      `Escritório: ${formatBRL(totals.escritorio)}\nCliente: ${formatBRL(totals.cliente)}\n` +
+      `Dr. Flávio: ${formatBRL(totals.flavio)}\nDr. Bruno (honorários): ${formatBRL(totals.bruno)}` +
+      (totals.parceiro > 0 ? `\nParceiros(as) — comissões (já descontadas do escritório): ${formatBRL(totals.parceiro)}` : "")
     );
   }
 
@@ -1068,10 +1510,13 @@ function RelatorioTab({ entries, onMarkSent, showToast, onGeneratePDF, pdfBusy }
             <span style={{ fontFamily: FONT_SERIF, fontSize: 12, fontWeight: 700, color: C.brassSoft, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 10, display: "block" }}>Totais do relatório</span>
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               <TotalRow label="Valor total levantado" value={totals.total} strong />
-              <TotalRow label="Escritório" value={totals.escritorio} />
+              {totals.destaque > 0 && <TotalRow label="· RPV/Precatório (principal)" value={totals.principal} />}
+              {totals.destaque > 0 && <TotalRow label="· Destaque de honorários" value={totals.destaque} />}
+              <TotalRow label={totals.parceiro > 0 ? "Escritório (líquido)" : "Escritório"} value={totals.escritorio} />
               <TotalRow label="Cliente" value={totals.cliente} />
               <TotalRow label="Dr. Flávio" value={totals.flavio} />
               <TotalRow label="Dr. Bruno (honorários)" value={totals.bruno} />
+              {totals.parceiro > 0 && <TotalRow label="Parceiros(as) — comissões" value={totals.parceiro} />}
             </div>
           </div>
 
@@ -1079,7 +1524,7 @@ function RelatorioTab({ entries, onMarkSent, showToast, onGeneratePDF, pdfBusy }
             <button onClick={copyReport} disabled={lista.length === 0} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: C.ink, color: "#fff", fontFamily: FONT_SANS, fontSize: 13.5, fontWeight: 700, padding: 13, borderRadius: 10, border: "none", cursor: lista.length === 0 ? "default" : "pointer", opacity: lista.length === 0 ? 0.5 : 1 }}>
               <Icon name="copy" size={15} /> Copiar texto
             </button>
-            <button onClick={() => onGeneratePDF(lista, totals, periodoLabel)} disabled={lista.length === 0 || pdfBusy} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: "#fff", color: C.ink, fontFamily: FONT_SANS, fontSize: 13.5, fontWeight: 700, padding: 13, borderRadius: 10, border: `1.5px solid ${C.rule}`, cursor: (lista.length === 0 || pdfBusy) ? "default" : "pointer", opacity: (lista.length === 0 || pdfBusy) ? 0.5 : 1 }}>
+            <button onClick={() => onGeneratePDF(listaP, totals, periodoLabel)} disabled={lista.length === 0 || pdfBusy} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: "#fff", color: C.ink, fontFamily: FONT_SANS, fontSize: 13.5, fontWeight: 700, padding: 13, borderRadius: 10, border: `1.5px solid ${C.rule}`, cursor: (lista.length === 0 || pdfBusy) ? "default" : "pointer", opacity: (lista.length === 0 || pdfBusy) ? 0.5 : 1 }}>
               {pdfBusy ? <Spinner size={15} color={C.ink} /> : <Icon name="printer" size={15} />} {pdfBusy ? "Gerando..." : "Baixar PDF"}
             </button>
           </div>
@@ -1101,6 +1546,20 @@ function RelatorioTab({ entries, onMarkSent, showToast, onGeneratePDF, pdfBusy }
           )}
         </React.Fragment>
       )}
+
+      <div style={cardStyle}>
+        <span style={sectionLabelStyle}>Backup</span>
+        <p style={{ fontFamily: FONT_SANS, fontSize: 12.5, color: C.inkSoft, lineHeight: 1.5, marginBottom: 12 }}>
+          Baixa um arquivo com todos os clientes e levantamentos cadastrados (inclusive fotos e PDFs de comprovante). Guarde essa cópia no computador, Google Drive ou onde preferir, como segurança extra.
+        </p>
+        <button
+          onClick={onBackup}
+          disabled={pdfBusy}
+          style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: "#fff", color: C.ink, fontFamily: FONT_SANS, fontSize: 13.5, fontWeight: 700, padding: 13, borderRadius: 10, border: `1.5px solid ${C.rule}`, cursor: pdfBusy ? "default" : "pointer", opacity: pdfBusy ? 0.6 : 1 }}
+        >
+          {pdfBusy ? <Spinner size={15} color={C.ink} /> : <Icon name="clipboard" size={15} />} {pdfBusy ? "Gerando..." : "Baixar backup completo"}
+        </button>
+      </div>
     </div>
   );
 }
@@ -1173,6 +1632,12 @@ function buildSinglePdfBlob(entry, cliente, photo) {
     ["Valor total levantado", formatBRL(entry.valorTotal)],
   ];
   if (entry.sucumbencial) levRows.push(["Natureza", "Honorários sucumbenciais (100% do dono do cliente)"]);
+  if (tipoLevLabel(entry)) {
+    levRows.push(["Tipo de levantamento", tipoLevLabel(entry)]);
+    if (entry.valorPrincipal > 0) levRows.push([`Levantado — ${reqLabel(entry.tipoRequisicao)} (principal)`, formatBRL(entry.valorPrincipal)]);
+    if (entry.valorDestaque > 0) levRows.push(["Levantado — destaque de honorários", formatBRL(entry.valorDestaque)]);
+  }
+  if (entry._pend) levRows.push(["Pendente", entry._pend]);
   y = pdfInfoTable(doc, y, levRows);
 
   doc.setFont("times", "bold");
@@ -1180,15 +1645,17 @@ function buildSinglePdfBlob(entry, cliente, photo) {
   doc.setTextColor(...PDF_BRASS);
   doc.text("RATEIO", 40, y);
   y += 6;
+  const rateioBody = [
+    [entry.valorParceiro > 0 ? "Escritório (líquido, após comissão)" : "Escritório", formatBRL(entry.valorEscritorio)],
+    ["Cliente", formatBRL(entry.valorCliente)],
+    ["Dr. Flávio", formatBRL(entry.valorFlavio)],
+    ["Dr. Bruno (honorários)", formatBRL(entry.valorBruno)],
+  ];
+  if (entry.valorParceiro > 0) rateioBody.push([`Parceiro(a)${entry.parceiroNome ? " — " + entry.parceiroNome : ""} (comissão paga pelo escritório)`, formatBRL(entry.valorParceiro)]);
   doc.autoTable({
     startY: y,
     head: [["Destinatário", "Valor"]],
-    body: [
-      ["Escritório", formatBRL(entry.valorEscritorio)],
-      ["Cliente", formatBRL(entry.valorCliente)],
-      ["Dr. Flávio", formatBRL(entry.valorFlavio)],
-      ["Dr. Bruno (honorários)", formatBRL(entry.valorBruno)],
-    ],
+    body: rateioBody,
     styles: { font: "helvetica", fontSize: 10, cellPadding: 6, textColor: PDF_INK },
     headStyles: { fillColor: PDF_BRASS_BG, textColor: PDF_BRASS, fontStyle: "bold" },
     columnStyles: { 1: { halign: "right" } },
@@ -1234,13 +1701,15 @@ function buildBatchPdfBlob(list, totals, periodoLabel) {
   doc.text(`Gerado em ${formatDateBR(todayISO())} · Período: ${periodoLabel} · ${list.length} levantamento(s)`, 40, y);
   y += 16;
 
+  const temParceiroLote = list.some((en) => en.valorParceiro > 0);
   doc.autoTable({
     startY: y,
-    head: [["Cliente", "Processo", "Banco", "Data", "Responsável", "Total", "Escritório", "Cliente", "Dr. Flávio", "Dr. Bruno"]],
+    head: [["Cliente", "Processo", "Banco", "Levantamento", "Data", "Responsável", "Total", temParceiroLote ? "Escritório (líq.)" : "Escritório", "Cliente", "Dr. Flávio", "Dr. Bruno"].concat(temParceiroLote ? ["Parceiro(a)"] : [])],
     body: list.map((en) => [
       en.cliente,
       en.processo,
       BANCOS[en.banco] ? BANCOS[en.banco].short : en.banco,
+      tipoLevCurto(en) + (en._pend ? `\nPendente: ${en._pend}` : ""),
       formatDateBR(en.dataLevantamento),
       en.responsavel,
       formatBRL(en.valorTotal),
@@ -1248,10 +1717,10 @@ function buildBatchPdfBlob(list, totals, periodoLabel) {
       formatBRL(en.valorCliente),
       formatBRL(en.valorFlavio),
       formatBRL(en.valorBruno),
-    ]),
-    styles: { font: "helvetica", fontSize: 8.5, cellPadding: 5, textColor: PDF_INK },
+    ].concat(temParceiroLote ? [en.valorParceiro > 0 ? `${formatBRL(en.valorParceiro)}${en.parceiroNome ? "\n" + en.parceiroNome : ""}` : "—"] : [])),
+    styles: { font: "helvetica", fontSize: 8, cellPadding: 4, textColor: PDF_INK },
     headStyles: { fillColor: PDF_BRASS_BG, textColor: PDF_BRASS, fontStyle: "bold" },
-    columnStyles: { 5: { halign: "right" }, 6: { halign: "right" }, 7: { halign: "right" }, 8: { halign: "right" }, 9: { halign: "right" } },
+    columnStyles: { 6: { halign: "right" }, 7: { halign: "right" }, 8: { halign: "right" }, 9: { halign: "right" }, 10: { halign: "right" }, 11: { halign: "right" }, 3: { cellWidth: 95 } },
     margin: { left: 40, right: 40 },
   });
   y = doc.lastAutoTable.finalY + 16;
@@ -1260,11 +1729,12 @@ function buildBatchPdfBlob(list, totals, periodoLabel) {
     startY: y,
     body: [
       ["Valor total levantado", formatBRL(totals.total)],
-      ["Escritório", formatBRL(totals.escritorio)],
+    ].concat(totals.destaque > 0 ? [["· RPV/Precatório (principal)", formatBRL(totals.principal)], ["· Destaque de honorários", formatBRL(totals.destaque)]] : []).concat([
+      [temParceiroLote ? "Escritório (líquido)" : "Escritório", formatBRL(totals.escritorio)],
       ["Cliente", formatBRL(totals.cliente)],
       ["Dr. Flávio", formatBRL(totals.flavio)],
       ["Dr. Bruno (honorários)", formatBRL(totals.bruno)],
-    ],
+    ].concat(temParceiroLote ? [["Parceiros(as) — comissões", formatBRL(totals.parceiro)]] : [])),
     theme: "plain",
     styles: { font: "helvetica", fontSize: 10, cellPadding: 3, textColor: PDF_INK },
     columnStyles: { 0: { fontStyle: "bold", textColor: PDF_SOFT, cellWidth: 180 }, 1: { fontStyle: "bold" } },
@@ -1277,9 +1747,9 @@ function buildBatchPdfBlob(list, totals, periodoLabel) {
 }
 
 async function shareFiles(items, showToast) {
-  // items: [{ blob, filename }, ...]
+  // items: [{ blob, filename, type? }, ...]
   try {
-    const files = items.map((it) => new File([it.blob], it.filename, { type: "application/pdf" }));
+    const files = items.map((it) => new File([it.blob], it.filename, { type: it.type || "application/pdf" }));
     if (navigator.canShare && navigator.canShare({ files })) {
       await navigator.share({ files, title: items[0].filename });
       return;
@@ -1373,6 +1843,7 @@ function RPVLedgerApp() {
       valorFlavio: entry.valorFlavio ? String(entry.valorFlavio) : "",
       valorBruno: entry.valorBruno ? String(entry.valorBruno) : "",
       sucumbencial: !!entry.sucumbencial, obs: entry.obs || "",
+      valorPrincipal: entry.valorPrincipal ? String(entry.valorPrincipal) : "", valorDestaque: entry.valorDestaque ? String(entry.valorDestaque) : "",
     });
     setPhotoDataUrl(entry.foto || null);
     setTab("novo");
@@ -1401,26 +1872,33 @@ function RPVLedgerApp() {
 
   async function handleSubmit(e) {
     e.preventDefault();
-    if (!form.cliente.trim() || !form.processo.trim() || !form.dataLevantamento || !form.responsavel.trim() || !form.valorTotal) {
-      showToast("Preencha os campos obrigatórios.", "error"); return;
+    const linkedClient = clientes.find((c) => c.id === form.clienteId) || null;
+    const usaDestaque = !!(linkedClient && linkedClient.temDestaque);
+    const vP = usaDestaque ? parseNum(form.valorPrincipal) : parseNum(form.valorTotal);
+    const vD = usaDestaque ? parseNum(form.valorDestaque) : 0;
+    const totalLev = vP + vD;
+    if (!form.cliente.trim() || !form.processo.trim() || !form.dataLevantamento || !form.responsavel.trim() || !(totalLev > 0)) {
+      showToast(usaDestaque && !(totalLev > 0) ? "Informe o valor levantado do principal e/ou do destaque." : "Preencha os campos obrigatórios.", "error"); return;
     }
     setSaving(true);
     const id = editingId || newId("rpv");
     const baseEntry = editingId ? entries.find((en) => en.id === editingId) : null;
-    const linkedClient = clientes.find((c) => c.id === form.clienteId) || null;
 
     let valores;
     if (linkedClient && !rateioManual) {
-      const split = computeSplit({ valorTotal: parseNum(form.valorTotal), percentualExito: linkedClient.percentualExito, dono: linkedClient.dono, sucumbencial: form.sucumbencial, valorAdministrativo: linkedClient.valorAdministrativo, valorGastos: linkedClient.gastosReembolsaveis });
-      valores = { valorEscritorio: split.escritorio, valorCliente: split.cliente, valorFlavio: split.flavio, valorBruno: split.bruno };
+      const split = computeLevantamento({ cliente: linkedClient, vPrincipal: vP, vDestaque: vD, sucumbencial: form.sucumbencial, parceiroJaPago: parceiroJaPagoDe(entries, linkedClient.id, editingId) });
+      valores = { valorEscritorio: split.escritorio, valorCliente: split.cliente, valorFlavio: split.flavio, valorBruno: split.bruno,
+        valorParceiro: split.comissaoParceiro, parceiroNome: split.comissaoParceiro > 0 ? (linkedClient.parceiroNome || "").trim() : null };
     } else {
-      valores = { valorEscritorio: parseNum(form.valorEscritorio), valorCliente: parseNum(form.valorCliente), valorFlavio: parseNum(form.valorFlavio), valorBruno: parseNum(form.valorBruno) };
+      valores = { valorEscritorio: parseNum(form.valorEscritorio), valorCliente: parseNum(form.valorCliente), valorFlavio: parseNum(form.valorFlavio), valorBruno: parseNum(form.valorBruno), valorParceiro: 0, parceiroNome: null };
     }
 
     const entry = {
       id, clienteId: form.clienteId || null, cliente: form.cliente.trim(), processo: form.processo.trim(),
       banco: form.banco, dataLevantamento: form.dataLevantamento, responsavel: form.responsavel.trim(),
-      valorTotal: parseNum(form.valorTotal), ...valores, sucumbencial: !!form.sucumbencial,
+      valorTotal: totalLev, ...valores, sucumbencial: !!form.sucumbencial,
+      tipoLevantamento: !usaDestaque || form.sucumbencial ? "completo" : vP > 0 && vD > 0 ? "ambos" : vD > 0 ? "destaque" : "principal",
+      valorPrincipal: vP, valorDestaque: vD, tipoRequisicao: linkedClient ? (linkedClient.tipoRequisicao || "RPV") : (baseEntry ? baseEntry.tipoRequisicao || null : null),
       donoCliente: linkedClient ? linkedClient.dono : baseEntry ? baseEntry.donoCliente : null,
       obs: form.obs.trim(), foto: photoDataUrl || null, temFoto: !!photoDataUrl,
       enviado: baseEntry ? !!baseEntry.enviado : false, enviadoEm: baseEntry ? baseEntry.enviadoEm : null,
@@ -1461,7 +1939,8 @@ function RPVLedgerApp() {
     const photo = preloadedPhoto !== undefined ? preloadedPhoto : entry.foto || null;
     setPdfBusy(true);
     try {
-      const blob = buildSinglePdfBlob(entry, cliente, photo);
+      const entryP = { ...entry, _pend: pendenciaTexto(entry, cliente, entries) };
+      const blob = buildSinglePdfBlob(entryP, cliente, photo);
       const baseFilename = `RPV-${entry.cliente}-${entry.dataLevantamento}`.replace(/[^\w.\- ]/g, "");
       const items = [{ blob, filename: `${baseFilename}.pdf` }];
       if (photo && isPdfDataUrl(photo)) {
@@ -1485,6 +1964,26 @@ function RPVLedgerApp() {
     setPdfBusy(false);
   }
 
+  async function generateBackup() {
+    setPdfBusy(true);
+    try {
+      const payload = {
+        geradoEm: new Date().toISOString(),
+        totalClientes: clientes.length,
+        totalLevantamentos: entries.length,
+        clientes,
+        levantamentos: entries,
+      };
+      const json = JSON.stringify(payload, null, 2);
+      const blob = new Blob([json], { type: "application/json" });
+      const filename = `backup-controle-rpv-${todayISO()}.json`;
+      await shareFiles([{ blob, filename, type: "application/json" }], showToast);
+    } catch (err) {
+      showToast("Erro ao gerar backup: " + err.message, "error");
+    }
+    setPdfBusy(false);
+  }
+
   function resetClientForm() { setClientForm(EMPTY_CLIENT_FORM); setEditingClienteId(null); }
   function startEditCliente(cliente) {
     setEditingClienteId(cliente.id);
@@ -1496,6 +1995,9 @@ function RPVLedgerApp() {
       valorAdministrativo: cliente.valorAdministrativo ? String(cliente.valorAdministrativo) : "",
       gastosReembolsaveis: cliente.gastosReembolsaveis ? String(cliente.gastosReembolsaveis) : "",
       temSucumbencia: !!cliente.temSucumbencia, valorSucumbencial: cliente.valorSucumbencial ? String(cliente.valorSucumbencial) : "", obs: cliente.obs || "",
+      parceiroNome: cliente.parceiroNome || "", parceiroTipo: cliente.parceiroTipo || "percentual", parceiroValor: cliente.parceiroValor ? String(cliente.parceiroValor) : "",
+      tipoRequisicao: cliente.tipoRequisicao || "RPV", numeroRequisicao: cliente.numeroRequisicao || "",
+      temDestaque: !!cliente.temDestaque, valorDestaque: cliente.valorDestaque ? String(cliente.valorDestaque) : "",
     });
   }
 
@@ -1503,6 +2005,11 @@ function RPVLedgerApp() {
     e.preventDefault();
     if (!clientForm.nome.trim() || !clientForm.dono || !clientForm.percentualExito) {
       showToast("Preencha nome, dono do cliente e percentual do êxito.", "error"); return;
+    }
+    if (clientForm.temDestaque) {
+      const vd = parseNum(clientForm.valorDestaque), vt = parseNum(clientForm.valorEstimado);
+      if (!(vd > 0)) { showToast("Informe o valor do destaque de honorários (ou desmarque a caixa).", "error"); return; }
+      if (vt > 0 && vd >= vt) { showToast("O destaque precisa ser menor que o valor total da requisição.", "error"); return; }
     }
     setSavingCliente(true);
     const id = editingClienteId || newId("cli");
@@ -1513,6 +2020,10 @@ function RPVLedgerApp() {
       valorEstimado: parseNum(clientForm.valorEstimado), dono: clientForm.dono, percentualExito: parseNum(clientForm.percentualExito),
       valorAdministrativo: parseNum(clientForm.valorAdministrativo), gastosReembolsaveis: parseNum(clientForm.gastosReembolsaveis), temSucumbencia: !!clientForm.temSucumbencia,
       valorSucumbencial: parseNum(clientForm.valorSucumbencial), obs: clientForm.obs.trim(),
+      parceiroNome: clientForm.parceiroNome.trim(), parceiroTipo: clientForm.parceiroTipo === "fixo" ? "fixo" : "percentual",
+      parceiroValor: clientForm.parceiroNome.trim() ? parseNum(clientForm.parceiroValor) : 0,
+      tipoRequisicao: clientForm.tipoRequisicao === "Precatório" ? "Precatório" : "RPV", numeroRequisicao: clientForm.numeroRequisicao.trim(),
+      temDestaque: !!clientForm.temDestaque, valorDestaque: clientForm.temDestaque ? parseNum(clientForm.valorDestaque) : 0,
       criadoEm: base ? base.criadoEm : Date.now(), editadoEm: Date.now(),
     };
     try {
@@ -1558,18 +2069,18 @@ function RPVLedgerApp() {
             <Spinner size={20} color={C.inkSoft} /><span style={{ marginLeft: 8, fontFamily: FONT_SANS, fontSize: 14 }}>Carregando registros...</span>
           </div>
         ) : tab === "clientes" ? (
-          <ClientesTab clientes={clientes} clientForm={clientForm} setClientForm={setClientForm} onSubmit={handleSubmitCliente}
+          <ClientesTab clientes={clientes} entries={entries} clientForm={clientForm} setClientForm={setClientForm} onSubmit={handleSubmitCliente}
             editingClienteId={editingClienteId} onCancelEdit={resetClientForm} onEdit={startEditCliente} onDelete={handleDeleteCliente} saving={savingCliente} />
         ) : tab === "novo" ? (
           <FormTab form={form} setForm={setForm} onSubmit={handleSubmit} editingId={editingId} onCancelEdit={resetForm}
             photoDataUrl={photoDataUrl} setPhotoDataUrl={setPhotoDataUrl} photoBusy={photoBusy} fileInputRef={fileInputRef} valorInputRef={valorInputRef}
-            onPhotoFile={handlePhotoFile} responsaveisConhecidos={responsaveisConhecidos} clientes={clientes} saving={saving} showToast={showToast}
+            onPhotoFile={handlePhotoFile} responsaveisConhecidos={responsaveisConhecidos} clientes={clientes} entries={entries} saving={saving} showToast={showToast}
             rateioManual={rateioManual} setRateioManual={setRateioManual} lastSaved={lastSaved} onNextEntry={nextEntry}
             onGeneratePDF={(entry) => generateSinglePDF(entry, photoDataUrl)} pdfBusy={pdfBusy} />
         ) : tab === "historico" ? (
           <HistoricoTab entries={entries} pendentesCount={pendentes.length} totalPendente={totalPendente} onEdit={startEdit} onDelete={handleDelete} onGeneratePDF={(entry) => generateSinglePDF(entry)} pdfBusy={pdfBusy} />
         ) : (
-          <RelatorioTab entries={entries} onMarkSent={markAsSent} showToast={showToast} onGeneratePDF={generateBatchPDF} pdfBusy={pdfBusy} />
+          <RelatorioTab entries={entries} clientes={clientes} onMarkSent={markAsSent} showToast={showToast} onGeneratePDF={generateBatchPDF} pdfBusy={pdfBusy} onBackup={generateBackup} />
         )}
       </main>
 
