@@ -215,11 +215,18 @@ const BANCOS = {
 };
 const DONOS = { Bruno: { label: "Dr. Bruno" }, "Flávio": { label: "Dr. Flávio" } };
 
+// Quanto do administrativo o cliente já pagou por fora (aceita o formato antigo: caixa marcada = pago por inteiro).
+function adminPagoDe(cliente) {
+  const adm = Math.max(0, Number(cliente.valorAdministrativo) || 0);
+  const v = Math.max(0, Number(cliente.administrativoPagoValor) || 0);
+  if (v > 0) return Math.min(v, adm);
+  return cliente.administrativoPago ? adm : 0;
+}
 // Limite do administrativo: honorários + administrativo cobrados do cliente não passam de 50% do valor total da requisição.
 const LIMITE_DESCONTO_CLIENTE = 0.5;
 
 // Saque único (cliente SEM destaque de honorários): honorário = % de êxito sobre o valor levantado.
-function computeSplit({ valorTotal, percentualExito, dono, sucumbencial, valorAdministrativo, administrativoPago, valorGastos, parceiroTipo, parceiroValor, parceiroJaPago }) {
+function computeSplit({ valorTotal, percentualExito, dono, sucumbencial, valorAdministrativo, administrativoJaPago, valorGastos, parceiroTipo, parceiroValor, parceiroJaPago }) {
   const total = Number(valorTotal) || 0;
   const donoIsBruno = dono === "Bruno";
   if (sucumbencial) {
@@ -233,12 +240,12 @@ function computeSplit({ valorTotal, percentualExito, dono, sucumbencial, valorAd
     dono, honorarioTotal, baseDivisivel, excedente,
     honorarioPartes: { escritorio: baseDivisivel * 0.4, donoShare: baseDivisivel * 0.5 + excedente, outroShare: baseDivisivel * 0.1 },
     saldoCliente: Math.max(0, total - honorarioTotal), tetoAdministrativo: Math.max(0, total * LIMITE_DESCONTO_CLIENTE - honorarioTotal),
-    valorAdministrativo, administrativoPago, valorGastos, parceiroTipo, parceiroValor, parceiroJaPago, excedenteCliente: 0,
+    valorAdministrativo, administrativoJaPago, valorGastos, parceiroTipo, parceiroValor, parceiroJaPago, excedenteCliente: 0,
   });
 }
 
 // Passo comum: administrativo (com teto de 50%), gastos, cliente e comissão do parceiro.
-function fecharRateio({ dono, honorarioTotal, baseDivisivel, excedente, honorarioPartes, saldoCliente, tetoAdministrativo, valorAdministrativo, administrativoPago, valorGastos, parceiroTipo, parceiroValor, parceiroJaPago, excedenteCliente }) {
+function fecharRateio({ dono, honorarioTotal, baseDivisivel, excedente, honorarioPartes, saldoCliente, tetoAdministrativo, valorAdministrativo, administrativoJaPago, valorGastos, parceiroTipo, parceiroValor, parceiroJaPago, excedenteCliente }) {
   const donoIsBruno = dono === "Bruno";
   let escritorio = honorarioPartes.escritorio;
   let donoShare = honorarioPartes.donoShare;
@@ -248,7 +255,10 @@ function fecharRateio({ dono, honorarioTotal, baseDivisivel, excedente, honorari
   // Valor administrativo: debitado do cliente só até o teto (50% do total menos os honorários) e só se ainda não foi pago.
   // Vai integralmente para o escritório (cliente do Bruno) ou para o Dr. Flávio (cliente dele).
   // O que passar do teto NÃO é debitado: fica pendente para cobrança por outro meio (cartão, boleto, nota promissória).
-  const admDevido = administrativoPago ? 0 : Math.max(0, Number(valorAdministrativo) || 0);
+  // A parte que o cliente já pagou por fora não entra no cálculo nem no limite de 50%: só o que falta pagar.
+  const admBruto = Math.max(0, Number(valorAdministrativo) || 0);
+  const administrativoPagoValor = Math.min(admBruto, Math.max(0, Number(administrativoJaPago) || 0));
+  const admDevido = admBruto - administrativoPagoValor;
   const administrativoAplicado = Math.min(admDevido, Math.max(0, tetoAdministrativo), restante);
   const administrativoPendente = Math.max(0, admDevido - administrativoAplicado);
   if (donoIsBruno) escritorio += administrativoAplicado; else donoShare += administrativoAplicado;
@@ -274,7 +284,7 @@ function fecharRateio({ dono, honorarioTotal, baseDivisivel, excedente, honorari
     escritorio, cliente: restante, comissaoParceiro, baseComissao,
     flavio: donoIsBruno ? outroShare : donoShare,
     bruno: donoIsBruno ? donoShare : outroShare,
-    honorarioTotal, baseDivisivel, excedente, administrativoAplicado, administrativoPendente, gastosAplicado, excedenteCliente,
+    honorarioTotal, baseDivisivel, excedente, administrativoAplicado, administrativoPendente, administrativoPagoValor, gastosAplicado, excedenteCliente,
   };
 }
 
@@ -315,7 +325,7 @@ function computeDestaque({ cliente, vPrincipal, vDestaque, parceiroJaPago }) {
     baseDivisivel: hon * (plano.Hf > 0 ? plano.B / plano.Hf : 0), excedente: hon * (plano.Hf > 0 ? plano.X / plano.Hf : 0),
     honorarioPartes: { escritorio: hon * plano.rEscr, donoShare: hon * plano.rDono, outroShare: hon * plano.rOutro },
     saldoCliente: vp - excedenteCliente, tetoAdministrativo: plano.tetoAdministrativo,
-    valorAdministrativo: vp > 0 ? cliente.valorAdministrativo : 0, administrativoPago: cliente.administrativoPago,
+    valorAdministrativo: vp > 0 ? cliente.valorAdministrativo : 0, administrativoJaPago: adminPagoDe(cliente),
     valorGastos: vp > 0 ? cliente.gastosReembolsaveis : 0,
     parceiroTipo: cliente.parceiroTipo, parceiroValor: cliente.parceiroNome ? cliente.parceiroValor : 0, parceiroJaPago,
     excedenteCliente,
@@ -329,7 +339,7 @@ function computeLevantamento({ cliente, vPrincipal, vDestaque, sucumbencial, par
   if (!cliente.temDestaque || sucumbencial) {
     return computeSplit({
       valorTotal: vp + vd, percentualExito: cliente.percentualExito, dono: cliente.dono, sucumbencial: !!sucumbencial,
-      valorAdministrativo: cliente.valorAdministrativo, administrativoPago: cliente.administrativoPago, valorGastos: cliente.gastosReembolsaveis,
+      valorAdministrativo: cliente.valorAdministrativo, administrativoJaPago: adminPagoDe(cliente), valorGastos: cliente.gastosReembolsaveis,
       parceiroTipo: cliente.parceiroTipo, parceiroValor: cliente.parceiroNome ? cliente.parceiroValor : 0, parceiroJaPago,
     });
   }
@@ -393,7 +403,7 @@ const EMPTY_CLIENT_FORM = {
   dataCadastro: todayISO(), nome: "", cpf: "", numeroBeneficio: "", processo: "", valorEstimado: "",
   dono: "Bruno", percentualExito: "30", valorAdministrativo: "", gastosReembolsaveis: "", temSucumbencia: false, valorSucumbencial: "", obs: "",
   parceiroNome: "", parceiroTipo: "percentual", parceiroValor: "",
-  tipoRequisicao: "RPV", numeroRequisicao: "", temDestaque: false, valorDestaque: "", valorLiquido: "", administrativoPago: false,
+  tipoRequisicao: "RPV", numeroRequisicao: "", temDestaque: false, valorDestaque: "", valorLiquido: "", administrativoPago: false, administrativoPagoValor: "",
 };
 
 // ---------- Leitura do PDF do RPV / Precatório ----------
@@ -760,12 +770,12 @@ function LoginScreen() {
 }
 
 // ---------- Fee breakdown preview ----------
-function FeeBreakdown({ dono, percentualExito, valorEstimado, valorAdministrativo, administrativoPago, valorGastos, parceiroNome, parceiroTipo, parceiroValor, temDestaque, valorDestaque }) {
+function FeeBreakdown({ dono, percentualExito, valorEstimado, valorAdministrativo, administrativoPago, administrativoPagoValor, valorGastos, parceiroNome, parceiroTipo, parceiroValor, temDestaque, valorDestaque }) {
   const valor = parseNum(valorEstimado);
   const temParceiro = !!(parceiroNome && String(parceiroNome).trim());
   const destaqueNum = temDestaque ? Math.min(parseNum(valorDestaque), valor) : 0;
   const comDestaque = destaqueNum > 0;
-  const clienteSim = { percentualExito, dono, valorAdministrativo, administrativoPago, gastosReembolsaveis: valorGastos, parceiroTipo, parceiroNome: temParceiro ? parceiroNome : "", parceiroValor, temDestaque: comDestaque, valorDestaque: destaqueNum, valorEstimado: valor };
+  const clienteSim = { percentualExito, dono, valorAdministrativo: parseNum(valorAdministrativo), administrativoPago, administrativoPagoValor: parseNum(administrativoPagoValor), gastosReembolsaveis: valorGastos, parceiroTipo, parceiroNome: temParceiro ? parceiroNome : "", parceiroValor, temDestaque: comDestaque, valorDestaque: destaqueNum, valorEstimado: valor };
   const split = computeLevantamento({ cliente: clienteSim, vPrincipal: valor - destaqueNum, vDestaque: destaqueNum, sucumbencial: false, parceiroJaPago: 0 });
   const plano = comDestaque ? split.plano : null;
   const donoLabel = dono === "Flávio" ? "Dr. Flávio" : "Dr. Bruno";
@@ -793,11 +803,16 @@ function FeeBreakdown({ dono, percentualExito, valorEstimado, valorAdministrativ
           <BreakdownRow label={`${donoLabel}, dono do cliente (50% + excedente)`} value={donoTotal} bold />
           <BreakdownRow label={`${outroLabel}, outro sócio (10% do divisível)`} value={outroTotal} bold />
           <BreakdownRow label="Cliente recebe" value={split.cliente} />
-          {(split.administrativoAplicado > 0 || split.administrativoPendente > 0 || split.gastosAplicado > 0 || split.comissaoParceiro > 0 || (comDestaque && plano.destaqueMaiorQueContrato)) && (
+          {(split.administrativoAplicado > 0 || split.administrativoPendente > 0 || split.administrativoPagoValor > 0 || split.gastosAplicado > 0 || split.comissaoParceiro > 0 || (comDestaque && plano.destaqueMaiorQueContrato)) && (
             <div style={{ marginTop: 6 }}>
               {split.administrativoAplicado > 0 && (
                 <div style={{ fontFamily: FONT_SANS, fontSize: 11.5, color: "#B7C2CE", lineHeight: 1.5 }}>
                   Já inclui {formatBRL(split.administrativoAplicado)} de valor administrativo, descontado do cliente e somado {donoIsBrunoLocal ? "ao escritório" : `a ${donoLabel}`} acima.
+                </div>
+              )}
+              {split.administrativoPagoValor > 0 && (
+                <div style={{ fontFamily: FONT_SANS, fontSize: 11.5, color: "#B7C2CE", lineHeight: 1.5, marginBottom: 4 }}>
+                  Administrativo: {formatBRL(split.administrativoPagoValor)} já pagos pelo cliente (fora do cálculo e do limite de 50%).
                 </div>
               )}
               {split.administrativoPendente > 0 && (
@@ -887,7 +902,7 @@ function ClientesTab({ clientes, entries, clientForm, setClientForm, onSubmit, e
       }
       setClientForm((f) => {
         const n = { ...f };
-        if (fields.nome) n.nome = fields.nome;
+        if (fields.nome) n.nome = fields.nome.toLocaleUpperCase("pt-BR");
         if (fields.cpf) n.cpf = fields.cpf;
         if (fields.processo) n.processo = fields.processo;
         if (fields.tipoRequisicao) n.tipoRequisicao = fields.tipoRequisicao;
@@ -1005,7 +1020,7 @@ function ClientesTab({ clientes, entries, clientForm, setClientForm, onSubmit, e
             <Field label="Data de cadastro"><TextInput type="date" value={clientForm.dataCadastro} onChange={(e) => set("dataCadastro", e.target.value)} /></Field>
             <Field label="CPF"><TextInput value={clientForm.cpf} onChange={(e) => set("cpf", maskCPF(e.target.value))} placeholder="000.000.000-00" inputMode="numeric" style={{ fontFamily: FONT_MONO, fontSize: 14 }} /></Field>
           </div>
-          <Field label="Nome completo" required><TextInput value={clientForm.nome} onChange={(e) => set("nome", e.target.value)} placeholder="Nome do cliente" /></Field>
+          <Field label="Nome completo" required><TextInput value={clientForm.nome} onChange={(e) => set("nome", e.target.value.toLocaleUpperCase("pt-BR"))} placeholder="NOME DO CLIENTE" style={{ textTransform: "uppercase" }} /></Field>
           <div style={gridTwo}>
             <Field label="Número do benefício (NB)"><TextInput value={clientForm.numeroBeneficio} onChange={(e) => set("numeroBeneficio", e.target.value)} placeholder="000.000.000-0" style={{ fontFamily: FONT_MONO, fontSize: 14 }} /></Field>
             <Field label="Nº do processo"><TextInput value={clientForm.processo} onChange={(e) => set("processo", e.target.value)} placeholder="0000000-00.0000..." style={{ fontFamily: FONT_MONO, fontSize: 13 }} /></Field>
@@ -1037,10 +1052,25 @@ function ClientesTab({ clientes, entries, clientForm, setClientForm, onSubmit, e
             <span style={{ fontFamily: FONT_SANS, fontSize: 11.5, color: C.inkSoft }}>Administrativo do Dr. Flávio vai 100% para ele. Administrativo de cliente do Dr. Bruno vai 100% para o escritório. O desconto no RPV vai até o limite de 50% do valor total (honorários + administrativo); o que passar disso fica pendente para cobrança por outro meio.</span>
           </div>
           {clientForm.valorAdministrativo && (
-            <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, cursor: "pointer" }}>
-              <input type="checkbox" checked={!!clientForm.administrativoPago} onChange={(e) => set("administrativoPago", e.target.checked)} style={{ width: 16, height: 16, accentColor: C.brass }} />
-              <span style={{ fontFamily: FONT_SANS, fontSize: 12.5, color: C.ink }}>Administrativo já foi pago pelo cliente (não descontar do RPV)</span>
-            </label>
+            <div style={{ marginBottom: 12 }}>
+              <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+                <input type="checkbox" checked={!!clientForm.administrativoPago} onChange={(e) => setClientForm((f) => ({ ...f, administrativoPago: e.target.checked, administrativoPagoValor: e.target.checked ? (f.administrativoPagoValor || f.valorAdministrativo) : "" }))} style={{ width: 16, height: 16, accentColor: C.brass }} />
+                <span style={{ fontFamily: FONT_SANS, fontSize: 12.5, color: C.ink }}>Administrativo já foi pago pelo cliente (não descontar do RPV)</span>
+              </label>
+              {clientForm.administrativoPago && (
+                <div style={{ marginTop: 8, padding: 12, borderRadius: 9, backgroundColor: C.parchmentDark }}>
+                  <Field label="Quanto já foi pago do administrativo" hint="Esse valor sai do cálculo e do limite de 50%. Só o que faltar pagar pode ser descontado do RPV.">
+                    <MoneyInput value={clientForm.administrativoPagoValor} onChange={(e) => set("administrativoPagoValor", e.target.value)} />
+                  </Field>
+                  {parseNum(clientForm.valorAdministrativo) > 0 && (
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: 8, fontFamily: FONT_SANS, fontSize: 12.5, color: C.inkSoft }}>
+                      <span>Ainda a pagar</span>
+                      <strong style={{ color: C.ink, fontFamily: FONT_MONO }}>{formatBRL(Math.max(0, parseNum(clientForm.valorAdministrativo) - parseNum(clientForm.administrativoPagoValor)))}</strong>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           )}
 
           <Field label="Gastos reembolsáveis">
@@ -1099,7 +1129,7 @@ function ClientesTab({ clientes, entries, clientForm, setClientForm, onSubmit, e
         </div>
 
         <div style={{ marginBottom: 14 }}>
-          <FeeBreakdown dono={clientForm.dono} percentualExito={clientForm.percentualExito} valorEstimado={clientForm.temDestaque ? String(parseNum(clientForm.valorLiquido) + parseNum(clientForm.valorDestaque)) : clientForm.valorEstimado} valorAdministrativo={clientForm.valorAdministrativo} administrativoPago={clientForm.administrativoPago} valorGastos={clientForm.gastosReembolsaveis} parceiroNome={clientForm.parceiroNome} parceiroTipo={clientForm.parceiroTipo} parceiroValor={clientForm.parceiroValor} temDestaque={clientForm.temDestaque} valorDestaque={clientForm.valorDestaque} />
+          <FeeBreakdown dono={clientForm.dono} percentualExito={clientForm.percentualExito} valorEstimado={clientForm.temDestaque ? String(parseNum(clientForm.valorLiquido) + parseNum(clientForm.valorDestaque)) : clientForm.valorEstimado} valorAdministrativo={clientForm.valorAdministrativo} administrativoPago={clientForm.administrativoPago} administrativoPagoValor={clientForm.administrativoPagoValor} valorGastos={clientForm.gastosReembolsaveis} parceiroNome={clientForm.parceiroNome} parceiroTipo={clientForm.parceiroTipo} parceiroValor={clientForm.parceiroValor} temDestaque={clientForm.temDestaque} valorDestaque={clientForm.valorDestaque} />
         </div>
 
         {clientForm.temSucumbencia && (
@@ -1179,7 +1209,7 @@ function ClientCard({ cliente, entries, onEdit, confirmingDelete, onAskDelete, o
           {cliente.parceiroNome && <div style={{ marginTop: 4, fontFamily: FONT_SANS, fontSize: 12.5, color: C.inkSoft }}>Parceiro(a): <strong style={{ color: C.ink }}>{cliente.parceiroNome}</strong>{cliente.parceiroValor > 0 && <span> · comissão {cliente.parceiroTipo === "fixo" ? formatBRL(cliente.parceiroValor) : formatPct(cliente.parceiroValor)} (sai do escritório)</span>}</div>}
           {cliente.obs && <div style={{ marginTop: 4, fontFamily: FONT_SANS, fontSize: 12.5, color: C.inkSoft, fontStyle: "italic" }}>“{cliente.obs}”</div>}
           <div style={{ marginTop: 12 }}>
-            <FeeBreakdown dono={cliente.dono} percentualExito={cliente.percentualExito} valorEstimado={cliente.valorEstimado} valorAdministrativo={cliente.valorAdministrativo} administrativoPago={cliente.administrativoPago} valorGastos={cliente.gastosReembolsaveis} parceiroNome={cliente.parceiroNome} parceiroTipo={cliente.parceiroTipo} parceiroValor={cliente.parceiroValor} temDestaque={cliente.temDestaque} valorDestaque={cliente.valorDestaque} />
+            <FeeBreakdown dono={cliente.dono} percentualExito={cliente.percentualExito} valorEstimado={cliente.valorEstimado} valorAdministrativo={cliente.valorAdministrativo} administrativoPago={cliente.administrativoPago} administrativoPagoValor={cliente.administrativoPagoValor} valorGastos={cliente.gastosReembolsaveis} parceiroNome={cliente.parceiroNome} parceiroTipo={cliente.parceiroTipo} parceiroValor={cliente.parceiroValor} temDestaque={cliente.temDestaque} valorDestaque={cliente.valorDestaque} />
           </div>
           {cliente.temSucumbencia && (
             <div style={{ marginTop: 10 }}>
@@ -1306,7 +1336,7 @@ function FormTab({ form, setForm, onSubmit, editingId, onCancelEdit, photoDataUr
             <select value={form.clienteId} onChange={(e) => {
                 const id = e.target.value;
                 const c = clientes.find((cl) => cl.id === id);
-                setForm((f) => ({ ...f, clienteId: id, cliente: c ? c.nome : "", processo: c && c.processo ? c.processo : f.processo }));
+                setForm((f) => ({ ...f, clienteId: id, cliente: c ? c.nome.toLocaleUpperCase("pt-BR") : "", processo: c && c.processo ? c.processo : f.processo }));
                 setRateioManual(false);
                 if (id) setTimeout(() => valorInputRef.current && valorInputRef.current.focus(), 60);
               }} style={{ ...inputBase, appearance: "none", fontSize: 16, fontWeight: 600 }}>
@@ -2162,6 +2192,7 @@ function RPVLedgerApp() {
       temDestaque: !!cliente.temDestaque, valorDestaque: cliente.valorDestaque ? String(cliente.valorDestaque) : "",
       valorLiquido: cliente.temDestaque ? String(Math.max(0, (cliente.valorEstimado || 0) - (cliente.valorDestaque || 0))) : "",
       administrativoPago: !!cliente.administrativoPago,
+      administrativoPagoValor: cliente.administrativoPagoValor ? String(cliente.administrativoPagoValor) : (cliente.administrativoPago && cliente.valorAdministrativo ? String(cliente.valorAdministrativo) : ""),
     });
   }
 
@@ -2178,7 +2209,7 @@ function RPVLedgerApp() {
     const id = editingClienteId || newId("cli");
     const base = editingClienteId ? clientes.find((c) => c.id === editingClienteId) : null;
     const cliente = {
-      id, dataCadastro: clientForm.dataCadastro || todayISO(), nome: clientForm.nome.trim(), cpf: clientForm.cpf.trim(),
+      id, dataCadastro: clientForm.dataCadastro || todayISO(), nome: clientForm.nome.trim().toLocaleUpperCase("pt-BR"), cpf: clientForm.cpf.trim(),
       numeroBeneficio: clientForm.numeroBeneficio.trim(), processo: clientForm.processo.trim(),
       valorEstimado: clientForm.temDestaque ? parseNum(clientForm.valorLiquido) + parseNum(clientForm.valorDestaque) : parseNum(clientForm.valorEstimado), dono: clientForm.dono, percentualExito: parseNum(clientForm.percentualExito),
       valorAdministrativo: parseNum(clientForm.valorAdministrativo), gastosReembolsaveis: parseNum(clientForm.gastosReembolsaveis), temSucumbencia: !!clientForm.temSucumbencia,
@@ -2187,7 +2218,8 @@ function RPVLedgerApp() {
       parceiroValor: clientForm.parceiroNome.trim() ? parseNum(clientForm.parceiroValor) : 0,
       tipoRequisicao: clientForm.tipoRequisicao === "Precatório" ? "Precatório" : "RPV", numeroRequisicao: clientForm.numeroRequisicao.trim(),
       temDestaque: !!clientForm.temDestaque, valorDestaque: clientForm.temDestaque ? parseNum(clientForm.valorDestaque) : 0,
-      administrativoPago: !!clientForm.administrativoPago,
+      administrativoPago: !!clientForm.administrativoPago && parseNum(clientForm.valorAdministrativo) > 0,
+      administrativoPagoValor: clientForm.administrativoPago ? Math.min(parseNum(clientForm.administrativoPagoValor) || parseNum(clientForm.valorAdministrativo), parseNum(clientForm.valorAdministrativo)) : 0,
       criadoEm: base ? base.criadoEm : Date.now(), editadoEm: Date.now(),
     };
     try {
